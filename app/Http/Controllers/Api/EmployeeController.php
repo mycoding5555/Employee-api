@@ -13,7 +13,7 @@ class EmployeeController extends Controller
     // GET /api/employees?name=&department_id=
     public function index(Request $request)
     {
-        $query = Employee::with('department');
+        $query = Employee::with(['department', 'title']);
 
         if ($request->filled('name')) {
             $query->where('name', 'like', '%' . $request->input('name') . '%');

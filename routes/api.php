@@ -2,10 +2,14 @@
 
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\EmployeeController;
+use App\Http\Controllers\Api\TitleController;
 use Illuminate\Support\Facades\Route;
 
 // Departments
 Route::get('/departments', [DepartmentController::class, 'index']);
+
+// Titles
+Route::get('/titles', [TitleController::class, 'index']);
 
 // Employees
 Route::get('/employees', [EmployeeController::class, 'index']);

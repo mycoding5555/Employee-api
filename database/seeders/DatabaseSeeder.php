@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Department;
 use App\Models\Employee;
+use App\Models\Title;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Storage;
 
@@ -21,29 +22,34 @@ class DatabaseSeeder extends Seeder
         $marketing = Department::create(['name' => 'Marketing']);
         $sales    = Department::create(['name' => 'Sales']);
 
+        //crate titles
+         $director = Title::create(['name' => 'Director']);
+         $manager   = Title::create(['name' => 'Manager']);
+         $analyst   = Title::create(['name' => 'Analyst']);   
+
         // Employee data: [name, sex, department]
         $employees = [
             // IT
-            ['name' => 'John Doe',       'sex' => 'Male',   'dept' => $it],
-            ['name' => 'Jane Smith',      'sex' => 'Female', 'dept' => $it],
-            ['name' => 'Tom Harris',      'sex' => 'Male',   'dept' => $it],
-            ['name' => 'Lisa Wang',       'sex' => 'Female', 'dept' => $it],
+            ['name' => 'John Doe',       'sex' => 'Male', 'title' => $director, 'dept' => $it],
+            ['name' => 'Jane Smith',      'sex' => 'Female', 'title' => $manager, 'dept' => $it],
+            ['name' => 'Tom Harris',      'sex' => 'Male',   'title' => $analyst, 'dept' => $it],
+            ['name' => 'Lisa Wang',       'sex' => 'Female', 'title' => $analyst, 'dept' => $it],
             // HR
-            ['name' => 'Bob Wilson',      'sex' => 'Male',   'dept' => $hr],
-            ['name' => 'Alice Brown',     'sex' => 'Female', 'dept' => $hr],
-            ['name' => 'David Kim',       'sex' => 'Male',   'dept' => $hr],
+            ['name' => 'Bob Wilson',      'sex' => 'Male',   'title' => $manager, 'dept' => $hr],
+            ['name' => 'Alice Brown',     'sex' => 'Female', 'title' => $analyst, 'dept' => $hr],
+            ['name' => 'David Kim',       'sex' => 'Male',   'title' => $analyst, 'dept' => $hr],
             // Finance
-            ['name' => 'Charlie Lee',     'sex' => 'Male',   'dept' => $finance],
-            ['name' => 'Diana Chen',      'sex' => 'Female', 'dept' => $finance],
-            ['name' => 'Emma Taylor',     'sex' => 'Female', 'dept' => $finance],
+            ['name' => 'Charlie Lee',     'sex' => 'Male',   'title' => $manager, 'dept' => $finance],
+            ['name' => 'Diana Chen',      'sex' => 'Female', 'title' => $analyst, 'dept' => $finance],
+            ['name' => 'Emma Taylor',     'sex' => 'Female', 'title' => $analyst, 'dept' => $finance],
             // Marketing
-            ['name' => 'Frank Miller',    'sex' => 'Male',   'dept' => $marketing],
-            ['name' => 'Grace Nguyen',    'sex' => 'Female', 'dept' => $marketing],
-            ['name' => 'Hannah Scott',    'sex' => 'Female', 'dept' => $marketing],
+            ['name' => 'Frank Miller',    'sex' => 'Male',   'title' => $manager, 'dept' => $marketing],
+            ['name' => 'Grace Nguyen',    'sex' => 'Female', 'title' => $analyst, 'dept' => $marketing],
+            ['name' => 'Hannah Scott',    'sex' => 'Female', 'title' => $analyst, 'dept' => $marketing],
             // Sales
-            ['name' => 'Ivan Petrov',     'sex' => 'Male',   'dept' => $sales],
-            ['name' => 'Julia Adams',     'sex' => 'Female', 'dept' => $sales],
-            ['name' => 'Kevin Park',      'sex' => 'Male',   'dept' => $sales],
+            ['name' => 'Ivan Petrov',     'sex' => 'Male',   'title' => $manager, 'dept' => $sales],
+            ['name' => 'Julia Adams',     'sex' => 'Female', 'title' => $analyst, 'dept' => $sales],
+            ['name' => 'Kevin Park',      'sex' => 'Male',   'title' => $analyst, 'dept' => $sales],
         ];
 
         foreach ($employees as $data) {
@@ -53,6 +59,7 @@ class DatabaseSeeder extends Seeder
             Employee::create([
                 'name'          => $data['name'],
                 'sex'           => $data['sex'],
+                'title_id'      => $data['title']->id,
                 'department_id' => $data['dept']->id,
                 'photo'         => $photo,
             ]);
