@@ -5,402 +5,193 @@ namespace App\Http\Controllers;
 use App\Models\Civil_servants;
 use App\Models\Departments;
 use App\Models\Positions;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use ZipArchive;
 
 class CivilServantWebController extends Controller
 {
+    private const ROOT_DEPARTMENT_ID = 7; 
+
+    private const ALLOWED_SORTS = [
+        'last_name_kh',
+        'first_name_kh',
+        'gender_id',
+        'position_id',
+        'department_id',
+        'sort',
+    ];
+
+    // ──────────────────────────────────────────────
+    //  Public – listing
+    // ──────────────────────────────────────────────
+
+    /**
+     * Server-side paginated index page.
+     */
     public function index(Request $request)
     {
-        $department = Departments::find(7);
-     
-        $subDepartments = Departments::where('parent_id', 7)   
-            ->orderBy('sort')
-            ->get();
-        $positions = Positions::where('active', 1)
-            ->whereHas('civilServants')
-            ->orderBy('sort')
-            ->get();
         $filters = $request->only(['name_kh', 'department_id', 'position_id', 'sort_by', 'sort_dir']);
 
         $query = Civil_servants::with(['department', 'position', 'images']);
-
-        if ($request->filled('name_kh')) {
-            $search = $request->input('name_kh');
-            $query->where(function ($q) use ($search) {
-                $q->where('last_name_kh', 'like', '%' . $search . '%')
-                  ->orWhere('first_name_kh', 'like', '%' . $search . '%');
-            });
-        }
-
-        if ($request->filled('department_id')) {
-            $deptId = $request->input('department_id');
-            $deptIds = Departments::where('id', $deptId)
-                ->orWhere('parent_id', $deptId)
-                ->pluck('id')
-                ->toArray();
-            $query->whereIn('department_id', $deptIds);
-        }
-
-        if ($request->filled('position_id')) {
-            $query->where('position_id', $request->input('position_id'));
-        }
-
-        // Sorting
-        $sortBy = $request->input('sort_by', 'position_id');
-        $sortDir = $request->input('sort_dir', 'asc');
-        $allowedSorts = ['last_name_kh', 'first_name_kh', 'gender_id', 'position_id', 'department_id', 'sort'];
-        if (!in_array($sortBy, $allowedSorts)) {
-            $sortBy = 'position_id';
-        }
-        $sortDir = $sortDir === 'desc' ? 'desc' : 'asc';
-        if ($sortBy === 'position_id') {
-            $query->join('positions', 'civil_servants.position_id', '=', 'positions.id')
-                  ->orderBy('positions.sort', $sortDir)
-                  ->select('civil_servants.*');
-        } elseif ($sortBy === 'department_id') {
-            $query->join('departments as d', 'civil_servants.department_id', '=', 'd.id')
-                  ->leftJoin('departments as parent_d', 'd.parent_id', '=', 'parent_d.id')
-                  ->orderByRaw('CASE WHEN d.parent_id = 7 THEN d.sort WHEN d.id = 7 THEN 0 ELSE COALESCE(parent_d.sort, d.sort) END ' . $sortDir)
-                  ->orderBy('d.sort', $sortDir)
-                  ->select('civil_servants.*');
-        } else {
-            $query->orderBy($sortBy, $sortDir);
-        }
-
-        $civilServants = $query->paginate(20)->withQueryString();
-
-        return view('civil-servants.index', [
-            'civilServants'  => $civilServants,
-            'department'     => $department,
-            'subDepartments' => $subDepartments,
-            'positions'      => $positions,
-            'filters'        => $filters,
-            'photoBaseUrl'   => rtrim(env('PHOTO_BASE_URL', ''), '/'),
-            
-        ]);
-    }
-
-    public function search(Request $request)
-    {
-        $filters = $request->only(['name_kh', 'department_id', 'position_id', 'sort_by', 'sort_dir']);
-        $query = Civil_servants::with(['department', 'position', 'images']);
-
-        if ($request->filled('name_kh')) {
-            $search = $request->input('name_kh');
-            $query->where(function ($q) use ($search) {
-                $q->where('last_name_kh', 'like', '%' . $search . '%')
-                  ->orWhere('first_name_kh', 'like', '%' . $search . '%');
-            });
-        }
-
-        if ($request->filled('department_id')) {
-            $deptId = $request->input('department_id');
-            $deptIds = Departments::where('id', $deptId)
-                ->orWhere('parent_id', $deptId)
-                ->pluck('id')
-                ->toArray();
-            $query->whereIn('department_id', $deptIds);
-        }
-
-        if ($request->filled('position_id')) {
-            $query->where('position_id', $request->input('position_id'));
-        }
-
-        // Sorting
-        $sortBy = $request->input('sort_by', 'position_id');
-        $sortDir = $request->input('sort_dir', 'asc');
-        $allowedSorts = ['last_name_kh', 'first_name_kh', 'gender_id', 'position_id', 'department_id', 'sort'];
-        if (!in_array($sortBy, $allowedSorts)) {
-            $sortBy = 'position_id';
-        }
-        $sortDir = $sortDir === 'desc' ? 'desc' : 'asc';
-        if ($sortBy === 'position_id') {
-            $query->join('positions', 'civil_servants.position_id', '=', 'positions.id')
-                  ->orderBy('positions.sort', $sortDir)
-                  ->select('civil_servants.*');
-        } elseif ($sortBy === 'department_id') {
-            $query->join('departments as d', 'civil_servants.department_id', '=', 'd.id')
-                  ->leftJoin('departments as parent_d', 'd.parent_id', '=', 'parent_d.id')
-                  ->orderByRaw('CASE WHEN d.parent_id = 7 THEN d.sort WHEN d.id = 7 THEN 0 ELSE COALESCE(parent_d.sort, d.sort) END ' . $sortDir)
-                  ->orderBy('d.sort', $sortDir)
-                  ->select('civil_servants.*');
-        } else {
-            $query->orderBy($sortBy, $sortDir);
-        }
+        $this->applyFilters($query, $request);
+        $this->applySorting($query, $request);
 
         return view('civil-servants.index', [
             'civilServants'  => $query->paginate(20)->withQueryString(),
-            'department'     => Departments::find(7),
-            'subDepartments' => Departments::where('parent_id', 7)
-                ->orWhereIn('parent_id', Departments::where('parent_id', 7)->pluck('id'))
-                ->orderBy('sort')
-                ->get(),
+            'department'     => Departments::find(self::ROOT_DEPARTMENT_ID),
+            'subDepartments' => Departments::where('parent_id', self::ROOT_DEPARTMENT_ID)->orderBy('sort')->get(),
             'positions'      => Positions::where('active', 1)->whereHas('civilServants')->orderBy('sort')->get(),
             'filters'        => $filters,
-            'photoBaseUrl'   => rtrim(env('PHOTO_BASE_URL', ''), '/'),
-            
+            'photoBaseUrl'   => $this->photoBaseUrl(),
         ]);
     }
 
-    public function ajaxSearch(Request $request)
+    /**
+     * Alias kept for the named route `civil-servants.search`.
+     */
+    public function search(Request $request)
+    {
+        return $this->index($request);
+    }
+
+    /**
+     * AJAX search – returns full JSON collection (client-side pagination).
+     */
+    public function ajaxSearch(Request $request): JsonResponse
     {
         $query = Civil_servants::with(['department', 'position', 'images']);
-
-        if ($request->filled('name_kh')) {
-            $search = $request->input('name_kh');
-            $query->where(function ($q) use ($search) {
-                $q->where('last_name_kh', 'like', '%' . $search . '%')
-                  ->orWhere('first_name_kh', 'like', '%' . $search . '%');
-            });
-        }
-
-        if ($request->filled('department_id')) {
-            $deptId = $request->input('department_id');
-            $deptIds = Departments::where('id', $deptId)
-                ->orWhere('parent_id', $deptId)
-                ->pluck('id')
-                ->toArray();
-            $query->whereIn('department_id', $deptIds);
-        }
-
-        if ($request->filled('position_id')) {
-            $query->where('position_id', $request->input('position_id'));
-        }
-
-        // Sorting
-        $sortBy = $request->input('sort_by', 'position_id');
-        $sortDir = $request->input('sort_dir', 'asc');
-        $allowedSorts = ['last_name_kh', 'first_name_kh', 'gender_id', 'position_id', 'department_id', 'sort'];
-        if (!in_array($sortBy, $allowedSorts)) {
-            $sortBy = 'position_id';
-        }
-        $sortDir = $sortDir === 'desc' ? 'desc' : 'asc';
-        if ($sortBy === 'position_id') {
-            $query->join('positions', 'civil_servants.position_id', '=', 'positions.id')
-                  ->orderBy('positions.sort', $sortDir)
-                  ->select('civil_servants.*');
-        } elseif ($sortBy === 'department_id') {
-            $query->join('departments as d', 'civil_servants.department_id', '=', 'd.id')
-                  ->leftJoin('departments as parent_d', 'd.parent_id', '=', 'parent_d.id')
-                  ->orderByRaw('CASE WHEN d.parent_id = 7 THEN d.sort WHEN d.id = 7 THEN 0 ELSE COALESCE(parent_d.sort, d.sort) END ' . $sortDir)
-                  ->orderBy('d.sort', $sortDir)
-                  ->select('civil_servants.*');
-        } else {
-            $query->orderBy($sortBy, $sortDir);
-        }
+        $this->applyFilters($query, $request);
+        $this->applySorting($query, $request);
 
         return response()->json($query->get());
     }
 
-    public function showPhoto($civilServantId)
+    // ──────────────────────────────────────────────
+    //  Public – single photo
+    // ──────────────────────────────────────────────
+
+    /**
+     * Show a civil servant's photo (inline).
+     */
+    public function showPhoto(string $civilServantId): Response|RedirectResponse|StreamedResponse|BinaryFileResponse
     {
         $civilServant = Civil_servants::with(['images', 'position'])->findOrFail($civilServantId);
         $image = $civilServant->images->first();
 
-        if (!$image) {
-            abort(404);
-        }
+        abort_unless($image, 404);
 
-        // If remote photo URL is configured, redirect there
-        $photoBaseUrl = rtrim(env('PHOTO_BASE_URL', ''), '/');
+        // Remote redirect
+        $photoBaseUrl = $this->photoBaseUrl();
         if ($photoBaseUrl) {
             return redirect($photoBaseUrl . '/' . rawurlencode($image->name));
         }
 
-        // Try local storage (position subfolder first, then flat)
-        $positionName = $civilServant->position->name_kh ?? null;
-        $possiblePaths = [];
-        if ($positionName) {
-            $possiblePaths[] = 'photos/' . $positionName . '/' . $image->name;
-        }
-        $possiblePaths[] = 'photos/' . $image->name;
-        $possiblePaths[] = $image->name;
-
-        foreach ($possiblePaths as $path) {
-            if (Storage::disk('public')->exists($path)) {
-                $filePath = Storage::disk('public')->path($path);
-                return response()->file($filePath);
-            }
+        // Local storage
+        $localPath = $this->resolveLocalPath($civilServant, $image);
+        if ($localPath) {
+            return response()->file($localPath);
         }
 
-        // Try HRMIS endpoint by civil servant ID
-        $hrmisBase = rtrim(env('HRMIS_PHOTO_BASE', 'https://mef-pd.net/hrmis/api/profile_image'), '/');
-        if ($hrmisBase) {
-            try {
-                $remote = Http::timeout(10)->get($hrmisBase . '/' . rawurlencode($civilServantId));
-            } catch (\Exception $e) {
-                $remote = null;
-            }
-
-            if ($remote && $remote->successful() && $remote->body() !== '') {
-                $contentType = $remote->header('Content-Type', 'image/jpeg');
-                return response($remote->body(), 200)
-                    ->header('Content-Type', $contentType)
-                    ->header('Cache-Control', 'public, max-age=86400');
-            }
+        // HRMIS fallback
+        $body = $this->fetchRemotePhoto($civilServantId);
+        if ($body) {
+            return response($body['content'], 200)
+                ->header('Content-Type', $body['content_type'])
+                ->header('Cache-Control', 'public, max-age=86400');
         }
 
         abort(404);
     }
 
     /**
-     * Proxy an external HRMIS photo endpoint that expects a civil servant ID.
-     * Example external URL: https://mef-pd.net/hrmis/api/profile_image/{id}
+     * Proxy an external HRMIS photo endpoint by civil servant ID.
      */
-    public function proxyHrmisPhotoById($civilServantId)
+    public function proxyHrmisPhotoById(string $civilServantId): Response
     {
-        $externalBase = rtrim(env('HRMIS_PHOTO_BASE', 'https://mef-pd.net/hrmis/api/profile_image'), '/');
-        $url = $externalBase . '/' . rawurlencode($civilServantId);
+        $body = $this->fetchRemotePhoto($civilServantId);
 
-        try {
-            $res = Http::timeout(10)->get($url);
-        } catch (\Exception $e) {
-            abort(404);
-        }
+        abort_unless($body, 404);
 
-        if (!$res->successful()) {
-            abort(404);
-        }
-
-        $contentType = $res->header('Content-Type', 'image/jpeg');
-        return response($res->body(), 200)->header('Content-Type', $contentType);
+        return response($body['content'], 200)
+            ->header('Content-Type', $body['content_type']);
     }
 
-    public function downloadPhoto($civilServantId)
+    // ──────────────────────────────────────────────
+    //  Public – downloads
+    // ──────────────────────────────────────────────
+
+    /**
+     * Download a single civil servant's photo.
+     */
+    public function downloadPhoto(string $civilServantId): BinaryFileResponse
     {
         $civilServant = Civil_servants::with(['images', 'position'])->findOrFail($civilServantId);
         $image = $civilServant->images->first();
 
-        if (!$image) {
-            abort(404, 'Photo not found');
-        }
+        abort_unless($image, 404, 'Photo not found');
 
         $downloadName = $civilServant->last_name_kh . '_' . $civilServant->first_name_kh . '_' . $image->name;
 
-        //local storage 
-        $positionName = $civilServant->position->name_kh ?? null;
-        $possiblePaths = [];
-        if ($positionName) {
-            $possiblePaths[] = 'photos/' . $positionName . '/' . $image->name;
-        }
-        $possiblePaths[] = 'photos/' . $image->name;
-        $possiblePaths[] = $image->name;
-
-        foreach ($possiblePaths as $path) {
-            if (Storage::disk('public')->exists($path)) {
-                $filePath = Storage::disk('public')->path($path);
-                return response()->download($filePath, $downloadName);
-            }
+        // Local storage
+        $localPath = $this->resolveLocalPath($civilServant, $image);
+        if ($localPath) {
+            return response()->download($localPath, $downloadName);
         }
 
-        // Try HRMIS endpoint by civil servant ID first (some HRMIS APIs expect an ID)
-        $hrmisBase = rtrim(env('HRMIS_PHOTO_BASE', 'https://mef-pd.net/hrmis/api/profile_image'), '/');
-        if ($hrmisBase) {
-            try {
-                $remote = Http::timeout(10)->get($hrmisBase . '/' . rawurlencode($civilServantId));
-            } catch (\Exception $e) {
-                $remote = null;
-            }
-
-            if ($remote && $remote->successful() && $remote->body() !== '') {
-                $tempPath = tempnam(sys_get_temp_dir(), 'photo_');
-                file_put_contents($tempPath, $remote->body());
-                $contentType = $remote->header('Content-Type', 'image/jpeg');
-                $response = response()->download($tempPath, $downloadName);
-                $response->deleteFileAfterSend(true);
-                $response->headers->set('Content-Type', $contentType);
-                return $response;
-            }
+        // HRMIS by ID
+        $body = $this->fetchRemotePhoto($civilServantId);
+        if ($body) {
+            return $this->downloadFromString($body['content'], $downloadName, $body['content_type']);
         }
 
-        // Fallback: try configured PHOTO_BASE_URL using image filename (legacy behavior)
-        $photoBaseUrl = rtrim(env('PHOTO_BASE_URL', 'https://mef-pd.net/hrmis/api/civilservant/getImage'), '/');
+        // Legacy: PHOTO_BASE_URL by image filename
+        $photoBaseUrl = $this->photoBaseUrl();
         if ($photoBaseUrl) {
-            $remoteUrl = $photoBaseUrl . '/' . rawurlencode($image->name);
-            $tempPath = tempnam(sys_get_temp_dir(), 'photo_');
-            $contents = @file_get_contents($remoteUrl);
-            if ($contents !== false) {
-                file_put_contents($tempPath, $contents);
-                return response()->download($tempPath, $downloadName)->deleteFileAfterSend(true);
+            $body = $this->fetchUrl($photoBaseUrl . '/' . rawurlencode($image->name));
+            if ($body) {
+                return $this->downloadFromString($body['content'], $downloadName, $body['content_type']);
             }
         }
 
         abort(404, 'Photo not found');
     }
 
-    public function downloadDepartment($departmentId)
+    /**
+     * Download a ZIP of all photos for a department (and its children).
+     */
+    public function downloadDepartment(int $departmentId): JsonResponse|BinaryFileResponse|RedirectResponse
     {
-        // default to root department (7) when missing
-        $departmentId = $departmentId ?: 7;
-        // Allow longer processing for bulk photo downloads
+        $departmentId = $departmentId ?: self::ROOT_DEPARTMENT_ID;
+
         @set_time_limit(0);
-        $deptIds = Departments::where('id', $departmentId)
-            ->orWhere('parent_id', $departmentId)
-            ->pluck('id')
-            ->toArray();
+
+        $deptIds = $this->departmentWithChildIds($departmentId);
 
         $civilServants = Civil_servants::with(['images', 'position'])
             ->whereIn('department_id', $deptIds)
             ->whereHas('images')
             ->get();
 
-        // If debugging via query param, return details to help debug missing photos
         if (request()->boolean('debug')) {
-            $photoBaseUrl = rtrim(env('PHOTO_BASE_URL', ''), '/');
-            $hrmisBase = rtrim(env('HRMIS_PHOTO_BASE', 'https://mef-pd.net/hrmis/api/profile_image'), '/');
-            $debug = ['departmentId' => $departmentId, 'deptIds' => $deptIds, 'countCivilServants' => $civilServants->count(), 'items' => []];
-            foreach ($civilServants->take(3) as $cs) {
-                foreach ($cs->images as $img) {
-                    $paths = [];
-                    $positionName = $cs->position->name_kh ?? null;
-                    if ($positionName) $paths[] = 'photos/' . $positionName . '/' . $img->name;
-                    $paths[] = 'photos/' . $img->name;
-                    $paths[] = $img->name;
-                    $localExists = false;
-                    foreach ($paths as $p) {
-                        if (Storage::disk('public')->exists($p)) { $localExists = true; break; }
-                    }
-                    // Check HRMIS by civil servant ID
-                    $hrmisUrl = $hrmisBase ? $hrmisBase . '/' . rawurlencode($cs->id) : null;
-                    $hrmisOk = null;
-                    if ($hrmisUrl) {
-                        try { $res = Http::timeout(6)->get($hrmisUrl); $hrmisOk = $res->successful() && $res->body() !== ''; } catch (\Exception $e) { $hrmisOk = false; }
-                    }
-                    // Check PHOTO_BASE_URL by image name
-                    $remoteUrl = $photoBaseUrl ? $photoBaseUrl . '/' . rawurlencode($img->name) : null;
-                    $remoteHead = null;
-                    if ($remoteUrl) {
-                        try { $res = Http::timeout(6)->get($remoteUrl); $remoteHead = $res->successful(); } catch (\Exception $e) { $remoteHead = false; }
-                    }
-                    $debug['items'][] = [
-                        'civilServantId' => $cs->id,
-                        'name' => $cs->last_name_kh . ' ' . $cs->first_name_kh,
-                        'image' => $img->name,
-                        'localExists' => $localExists,
-                        'hrmisUrl' => $hrmisUrl,
-                        'hrmisAccessible' => $hrmisOk,
-                        'remoteUrl' => $remoteUrl,
-                        'remoteAccessible' => $remoteHead,
-                        'paths' => $paths,
-                    ];
-                }
-            }
-            return response()->json($debug);
+            return $this->buildDebugResponse($departmentId, $deptIds, $civilServants);
         }
 
         if ($civilServants->isEmpty()) {
             return back()->with('error', 'No photos found for this department');
         }
 
-        // Use department name for zip and inner folder
         $dept = Departments::find($departmentId);
         $deptName = ($dept && !empty($dept->name_kh)) ? $dept->name_kh : 'department_' . $departmentId;
-        $zipFileName = $deptName . '.zip';
         $folderPrefix = $deptName . '/';
-        // Safe filename for storage on disk
+
         $safeZipName = preg_replace('/[^\p{L}\p{N}_]+/u', '_', $deptName) . '.zip';
         $zipPath = storage_path('app/temp/' . $safeZipName);
 
@@ -413,74 +204,44 @@ class CivilServantWebController extends Controller
             return back()->with('error', 'Could not create zip');
         }
 
-        $photoBaseUrl = rtrim(env('PHOTO_BASE_URL', ''), '/');
-        $hrmisBase = rtrim(env('HRMIS_PHOTO_BASE', 'https://mef-pd.net/hrmis/api/profile_image'), '/');
+        $photoBaseUrl = $this->photoBaseUrl();
         $tempFiles = [];
         $addedFiles = 0;
+
         foreach ($civilServants as $civilServant) {
             $image = $civilServant->images->first();
-            if (!$image) continue;
+            if (!$image) {
+                continue;
+            }
 
             $baseName = $civilServant->last_name_kh . '_' . $civilServant->first_name_kh;
             $entryName = $baseName . '_' . $image->name;
-            $added = false;
 
-            // Try local storage first (position subfolder first, then flat)
-            $positionName = $civilServant->position->name_kh ?? null;
-            $possiblePaths = [];
-            if ($positionName) {
-                $possiblePaths[] = 'photos/' . $positionName . '/' . $image->name;
-            }
-            $possiblePaths[] = 'photos/' . $image->name;
-            $possiblePaths[] = $image->name;
-            foreach ($possiblePaths as $path) {
-                if (Storage::disk('public')->exists($path)) {
-                    $zip->addFile(Storage::disk('public')->path($path), $folderPrefix . $entryName);
-                    $addedFiles++;
-                    $added = true;
-                    break;
-                }
+            // 1) Local storage
+            $localPath = $this->resolveLocalPath($civilServant, $image);
+            if ($localPath) {
+                $zip->addFile($localPath, $folderPrefix . $entryName);
+                $addedFiles++;
+                continue;
             }
 
-            // Try HRMIS endpoint by civil servant ID (same as individual download)
-            if (!$added && $hrmisBase) {
-                try {
-                    $remote = Http::timeout(10)->get($hrmisBase . '/' . rawurlencode($civilServant->id));
-                } catch (\Exception $e) {
-                    $remote = null;
-                }
-
-                if ($remote && $remote->successful() && $remote->body() !== '') {
-                    // Determine file extension from Content-Type
-                    $ct = $remote->header('Content-Type', 'image/jpeg');
-                    $ext = match (true) {
-                        str_contains($ct, 'png')  => '.png',
-                        str_contains($ct, 'gif')  => '.gif',
-                        str_contains($ct, 'webp') => '.webp',
-                        default                    => '.jpg',
-                    };
-                    $zipEntryName = $baseName . $ext;
-
-                    $tempFile = tempnam(sys_get_temp_dir(), 'dept_photo_');
-                    file_put_contents($tempFile, $remote->body());
-                    $zip->addFile($tempFile, $folderPrefix . $zipEntryName);
-                    $tempFiles[] = $tempFile;
-                    $addedFiles++;
-                    $added = true;
-                }
+            // 2) HRMIS by ID
+            $body = $this->fetchRemotePhoto($civilServant->id);
+            if ($body) {
+                $ext = $this->extensionFromContentType($body['content_type']);
+                $zipEntryName = $baseName . $ext;
+                $tempFile = $this->writeTempFile($body['content']);
+                $zip->addFile($tempFile, $folderPrefix . $zipEntryName);
+                $tempFiles[] = $tempFile;
+                $addedFiles++;
+                continue;
             }
 
-            // Fallback: try PHOTO_BASE_URL with image filename
-            if (!$added && $photoBaseUrl) {
-                try {
-                    $remote = Http::timeout(10)->get($photoBaseUrl . '/' . rawurlencode($image->name));
-                } catch (\Exception $e) {
-                    $remote = null;
-                }
-
-                if ($remote && $remote->successful() && $remote->body() !== '') {
-                    $tempFile = tempnam(sys_get_temp_dir(), 'dept_photo_');
-                    file_put_contents($tempFile, $remote->body());
+            // 3) PHOTO_BASE_URL by filename
+            if ($photoBaseUrl) {
+                $body = $this->fetchUrl($photoBaseUrl . '/' . rawurlencode($image->name));
+                if ($body) {
+                    $tempFile = $this->writeTempFile($body['content']);
                     $zip->addFile($tempFile, $folderPrefix . $entryName);
                     $tempFiles[] = $tempFile;
                     $addedFiles++;
@@ -490,7 +251,6 @@ class CivilServantWebController extends Controller
 
         $zip->close();
 
-        // Clean up temp files from remote downloads
         foreach ($tempFiles as $tempFile) {
             @unlink($tempFile);
         }
@@ -500,44 +260,265 @@ class CivilServantWebController extends Controller
             return back()->with('error', 'No photo files found on disk');
         }
 
-        return response()->download($zipPath, $zipFileName)->deleteFileAfterSend(true);
+        return response()->download($zipPath, $deptName . '.zip')->deleteFileAfterSend(true);
     }
 
     /**
-     * Return JSON list of civil servants + download URLs for a department.
-     * Used by the frontend File System Access API to save photos into a folder.
+     * JSON list of civil servants + download URLs for a department.
      */
-    public function departmentPhotoList($departmentId)
+    public function departmentPhotoList(int $departmentId): JsonResponse
     {
-        $departmentId = $departmentId ?: 7;
+        $departmentId = $departmentId ?: self::ROOT_DEPARTMENT_ID;
 
         $dept = Departments::find($departmentId);
         $deptName = ($dept && !empty($dept->name_kh)) ? $dept->name_kh : 'department_' . $departmentId;
 
-        $deptIds = Departments::where('id', $departmentId)
-            ->orWhere('parent_id', $departmentId)
-            ->pluck('id')
-            ->toArray();
+        $deptIds = $this->departmentWithChildIds($departmentId);
 
-        $civilServants = Civil_servants::with(['images', 'position'])
+        $civilServants = Civil_servants::with('images')
             ->whereIn('department_id', $deptIds)
             ->whereHas('images')
             ->get();
 
-        $items = [];
-        foreach ($civilServants as $cs) {
+        $items = $civilServants->map(function (Civil_servants $cs) {
             $image = $cs->images->first();
-            if (!$image) continue;
-            $items[] = [
+
+            return $image ? [
                 'id'          => $cs->id,
                 'name'        => $cs->last_name_kh . ' ' . $cs->first_name_kh,
                 'downloadUrl' => '/civil-servants/download-photo/' . $cs->id,
-            ];
-        }
+            ] : null;
+        })->filter()->values();
 
         return response()->json([
             'folderName' => $deptName,
             'items'      => $items,
         ]);
+    }
+
+    // ──────────────────────────────────────────────
+    //  Private – query helpers
+    // ──────────────────────────────────────────────
+
+    private function applyFilters(Builder $query, Request $request): void
+    {
+        if ($request->filled('name_kh')) {
+            $search = $request->input('name_kh');
+            $query->where(function (Builder $q) use ($search) {
+                $q->where('last_name_kh', 'like', "%{$search}%")
+                  ->orWhere('first_name_kh', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('department_id')) {
+            $query->whereIn('department_id', $this->departmentWithChildIds($request->input('department_id')));
+        }
+
+        if ($request->filled('position_id')) {
+            $query->where('position_id', $request->input('position_id'));
+        }
+    }
+
+    private function applySorting(Builder $query, Request $request): void
+    {
+        $sortBy = $request->input('sort_by', 'position_id');
+        $sortDir = $request->input('sort_dir', 'asc') === 'desc' ? 'desc' : 'asc';
+
+        if (!in_array($sortBy, self::ALLOWED_SORTS, true)) {
+            $sortBy = 'position_id';
+        }
+
+        if ($sortBy === 'position_id') {
+            $query->join('positions', 'civil_servants.position_id', '=', 'positions.id')
+                  ->orderBy('positions.sort', $sortDir)
+                  ->select('civil_servants.*');
+        } elseif ($sortBy === 'department_id') {
+            $query->join('departments as d', 'civil_servants.department_id', '=', 'd.id')
+                  ->leftJoin('departments as parent_d', 'd.parent_id', '=', 'parent_d.id')
+                  ->orderByRaw(
+                      'CASE WHEN d.parent_id = ? THEN d.sort WHEN d.id = ? THEN 0 ELSE COALESCE(parent_d.sort, d.sort) END ' . $sortDir,
+                      [self::ROOT_DEPARTMENT_ID, self::ROOT_DEPARTMENT_ID]
+                  )
+                  ->orderBy('d.sort', $sortDir)
+                  ->select('civil_servants.*');
+        } else {
+            $query->orderBy($sortBy, $sortDir);
+        }
+    }
+
+    private function departmentWithChildIds(int|string $departmentId): array
+    {
+        return Departments::where('id', $departmentId)
+            ->orWhere('parent_id', $departmentId)
+            ->pluck('id')
+            ->toArray();
+    }
+
+    // ──────────────────────────────────────────────
+    //  Private – photo resolution
+    // ──────────────────────────────────────────────
+
+    private function photoBaseUrl(): string
+    {
+        return rtrim(config('services.hrmis.photo_base_url', ''), '/');
+    }
+
+    private function hrmisApiBase(): string
+    {
+        return rtrim(config('services.hrmis.photo_api_base', ''), '/');
+    }
+
+    /**
+     * Build the list of candidate local storage paths for a photo.
+     */
+    private function localPhotoPaths(Civil_servants $civilServant, $image): array
+    {
+        $paths = [];
+        $positionName = $civilServant->position->name_kh ?? null;
+
+        if ($positionName) {
+            $paths[] = 'photos/' . $positionName . '/' . $image->name;
+        }
+        $paths[] = 'photos/' . $image->name;
+        $paths[] = $image->name;
+
+        return $paths;
+    }
+
+    /**
+     * Resolve the absolute local disk path for a photo, or null if not found.
+     */
+    private function resolveLocalPath(Civil_servants $civilServant, $image): ?string
+    {
+        foreach ($this->localPhotoPaths($civilServant, $image) as $path) {
+            if (Storage::disk('public')->exists($path)) {
+                return Storage::disk('public')->path($path);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Fetch a photo from the HRMIS API by civil servant ID.
+     *
+     * @return array{content: string, content_type: string}|null
+     */
+    private function fetchRemotePhoto(string|int $civilServantId): ?array
+    {
+        $base = $this->hrmisApiBase();
+        if (!$base) {
+            return null;
+        }
+
+        try {
+            $response = Http::timeout(10)->get($base . '/' . rawurlencode($civilServantId));
+        } catch (\Exception) {
+            return null;
+        }
+
+        if (!$response->successful() || $response->body() === '') {
+            return null;
+        }
+
+        return [
+            'content'      => $response->body(),
+            'content_type' => $response->header('Content-Type', 'image/jpeg'),
+        ];
+    }
+
+    /**
+     * Generic URL fetch helper.
+     *
+     * @return array{content: string, content_type: string}|null
+     */
+    private function fetchUrl(string $url): ?array
+    {
+        try {
+            $response = Http::timeout(10)->get($url);
+        } catch (\Exception) {
+            return null;
+        }
+
+        if (!$response->successful() || $response->body() === '') {
+            return null;
+        }
+
+        return [
+            'content'      => $response->body(),
+            'content_type' => $response->header('Content-Type', 'image/jpeg'),
+        ];
+    }
+
+    // ──────────────────────────────────────────────
+    //  Private – utilities
+    // ──────────────────────────────────────────────
+
+    private function downloadFromString(string $content, string $filename, string $contentType = 'image/jpeg'): BinaryFileResponse
+    {
+        $tempPath = $this->writeTempFile($content);
+        $response = response()->download($tempPath, $filename);
+        $response->deleteFileAfterSend(true);
+        $response->headers->set('Content-Type', $contentType);
+
+        return $response;
+    }
+
+    private function writeTempFile(string $content): string
+    {
+        $path = tempnam(sys_get_temp_dir(), 'photo_');
+        file_put_contents($path, $content);
+
+        return $path;
+    }
+
+    private function extensionFromContentType(string $contentType): string
+    {
+        return match (true) {
+            str_contains($contentType, 'png')  => '.png',
+            str_contains($contentType, 'gif')  => '.gif',
+            str_contains($contentType, 'webp') => '.webp',
+            default                             => '.jpg',
+        };
+    }
+
+    private function buildDebugResponse(int $departmentId, array $deptIds, $civilServants): JsonResponse
+    {
+        $photoBaseUrl = $this->photoBaseUrl();
+        $hrmisBase = $this->hrmisApiBase();
+
+        $debug = [
+            'departmentId'      => $departmentId,
+            'deptIds'           => $deptIds,
+            'countCivilServants' => $civilServants->count(),
+            'items'             => [],
+        ];
+
+        foreach ($civilServants->take(3) as $cs) {
+            foreach ($cs->images as $img) {
+                $paths = $this->localPhotoPaths($cs, $img);
+                $localExists = $this->resolveLocalPath($cs, $img) !== null;
+
+                $hrmisUrl = $hrmisBase ? $hrmisBase . '/' . rawurlencode($cs->id) : null;
+                $hrmisOk = $hrmisUrl ? ($this->fetchRemotePhoto($cs->id) !== null) : null;
+
+                $remoteUrl = $photoBaseUrl ? $photoBaseUrl . '/' . rawurlencode($img->name) : null;
+                $remoteOk = $remoteUrl ? ($this->fetchUrl($remoteUrl) !== null) : null;
+
+                $debug['items'][] = [
+                    'civilServantId'  => $cs->id,
+                    'name'            => $cs->last_name_kh . ' ' . $cs->first_name_kh,
+                    'image'           => $img->name,
+                    'localExists'     => $localExists,
+                    'hrmisUrl'        => $hrmisUrl,
+                    'hrmisAccessible' => $hrmisOk,
+                    'remoteUrl'       => $remoteUrl,
+                    'remoteAccessible' => $remoteOk,
+                    'paths'           => $paths,
+                ];
+            }
+        }
+
+        return response()->json($debug);
     }
 }
