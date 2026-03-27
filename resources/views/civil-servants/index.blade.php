@@ -1,0 +1,504 @@
+@extends('layout.main')
+
+@section('title', 'បោះពុម្ភរូបថត')
+@section('page-title', 'បោះពុម្ភរូបថត')
+@section('page-subtitle', 'ស្វែងរក និងទាញយករូបថតមន្រ្តីរាជការ')
+
+@section('content')
+        {{-- Search Section --}}
+        <div class="search-section">
+            <div class="app-card">
+                <div class="card-body-custom">
+                    <form id="search-form" action="{{ route('civil-servants.index') }}" method="GET">
+                        <input type="hidden" name="sort_by" id="sort_by" value="{{ $filters['sort_by'] ?? 'position_id' }}">
+                        <input type="hidden" name="sort_dir" id="sort_dir" value="{{ $filters['sort_dir'] ?? 'asc' }}">
+                        <div class="mb-2">
+                            <span class="badge bg-primary" style="font-size:0.9rem;">
+                                <i class="bi bi-building me-1"></i> {{ $department->name_kh ?? 'អគ្គលេខាធិការដ្ឋាន' }}
+                            </span>
+                        </div>
+                        <div class="row g-3 align-items-end">
+                            <div class="col-md-3">
+                                <label for="name" class="form-label-custom">គោត្តនាម និងនាម</label>
+                                <div class="input-group ">
+                                    <span class="input-group-text" style="border-radius:8px 0 0 8px; background:var(--bg); border-color:var(--border); color:var(--text-muted);">
+                                        <i class="bi bi-search"></i>
+                                    </span>
+                                    <input type="text" class="form-control" id="name" name="name_kh"
+                                           value="{{ $filters['name_kh'] ?? '' }}"
+                                           placeholder="រកតាមរយៈគោត្តនាម និងនាម" 
+                                           style="border-left:none; border-radius:0 8px 8px 0;">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="department_id" class="form-label-custom">នាយកដ្ឋាន</label>
+                                <select class="form-select" id="department_id" name="department_id">
+                                    <option value="">នាយកដ្ឋានទាំងអស់</option>
+                                    <option value="7" {{ (isset($filters['department_id']) && $filters['department_id'] == 7) ? 'selected' : '' }}>អគ្គលេខាធិការដ្ឋាន</option>
+                                    @foreach($subDepartments as $sub)
+                                        <option value="{{ $sub->id }}"
+                                            {{ (isset($filters['department_id']) && $filters['department_id'] == $sub->id) ? 'selected' : '' }}>
+                                            {{ $sub->name_kh }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="position_id" class="form-label-custom">មុខតំណែង</label>
+                                <select class="form-select" id="position_id" name="position_id">
+                                    <option value="">មុខតំណែងទាំងអស់</option>
+                                    @foreach($positions as $pos)
+                                        <option value="{{ $pos['id'] }}"
+                                            {{ (isset($filters['position_id']) && $filters['position_id'] == $pos['id']) ? 'selected' : '' }}>
+                                            {{ $pos['name_kh'] ?? $pos['name_short'] ?? $pos['abb'] }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-md-3 d-flex gap-2">
+                                <button type="submit" class="btn btn-primary-custom grow">
+                                    <i class="bi bi-search me-1"></i> ស្វែងរក
+                                </button>
+                                <a href="{{ route('civil-servants.index') }}" class="btn btn-outline-custom" title="Reset filters">
+                                    <i class="bi bi-arrow-counterclockwise"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        {{-- Results --}}
+        <div id="results-container">
+        @if(isset($civilServants))
+            <div class="mt-4 mb-4">
+                <div class="app-card">
+                    <div class="card-header-custom">
+                        <span class="result-count">
+                            <i class="bi bi-people"></i> {{ $civilServants->total() }} មន្រ្តីរាជការរកឃើញ
+                        </span>
+
+                        @if(isset($filters['department_id']) && $filters['department_id'])
+                            <a href="{{ route('civil-servants.download-department', $filters['department_id']) }}"
+                               class="btn btn-success-custom">
+                                <i class="bi bi-file-earmark-zip me-1"></i> ទាញយករូបថតតាមនាយកដ្ឋាន
+                            </a>
+                        @else
+                            <a href="{{ route('civil-servants.download-department', 7) }}"
+                               class="btn btn-success-custom">
+                                <i class="bi bi-file-earmark-zip me-1"></i> ទាញយករូបថតទាំងអស់
+                            </a>
+                        @endif
+                    </div>
+
+                    @if($civilServants->total() > 0)
+                        @php
+                            $currentSortBy = $filters['sort_by'] ?? 'position_id';
+                            $currentSortDir = $filters['sort_dir'] ?? 'asc';
+                        @endphp
+                        <div class="table-responsive">
+                            <table class="table-custom table">
+                                <thead>
+                                    <tr>
+                                        <th style="width:60px">អត្តលេខ</th>
+                                        <th>រូបថត</th>
+                                        <th class="sortable-th" data-sort="last_name_kh">
+                                            គោត្តនាម និងនាម
+                                            @if($currentSortBy === 'last_name_kh')
+                                                <i class="bi bi-chevron-{{ $currentSortDir === 'asc' ? 'up' : 'down' }}"></i>
+                                            @else
+                                                <i class="bi bi-chevron-expand text-muted"></i>
+                                            @endif
+                                        </th>
+                                        <th class="sortable-th" data-sort="gender_id">
+                                            ភេទ
+                                            @if($currentSortBy === 'gender_id')
+                                                <i class="bi bi-chevron-{{ $currentSortDir === 'asc' ? 'up' : 'down' }}"></i>
+                                            @else
+                                                <i class="bi bi-chevron-expand text-muted"></i>
+                                            @endif
+                                        </th>
+                                        <th class="sortable-th" data-sort="position_id">
+                                            មុខតំណែង
+                                            @if($currentSortBy === 'position_id')
+                                                <i class="bi bi-chevron-{{ $currentSortDir === 'asc' ? 'up' : 'down' }}"></i>
+                                            @else
+                                                <i class="bi bi-chevron-expand text-muted"></i>
+                                            @endif
+                                        </th>
+                                        <th class="sortable-th" data-sort="department_id">
+                                            អង្គភាព
+                                            @if($currentSortBy === 'department_id')
+                                                <i class="bi bi-chevron-{{ $currentSortDir === 'asc' ? 'up' : 'down' }}"></i>
+                                            @else
+                                                <i class="bi bi-chevron-expand text-muted"></i>
+                                            @endif
+                                        </th>
+                                        <th style="width:160px">ទាញយករូបថត</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @php
+                                        $avatarColors = ['#4f46e5','#7c3aed','#2563eb','#0891b2','#059669','#d97706','#dc2626','#db2777'];
+                                        $lastPositionName = null;
+                                        $lastDepartmentName = null;
+                                    @endphp
+                                    @foreach($civilServants as $i => $emp)
+                                        @php
+                                            $fullName = trim(($emp['last_name_kh'] ?? '') . ' ' . ($emp['first_name_kh'] ?? ''));
+                                            $positionName = $emp['position']['name_kh'] ?? $emp['position']['name_short'] ?? $emp['position']['abb'] ?? 'គ្មានមុខតំណែង';
+                                            $nayokName = $deptGroupMap[$emp->department_id] ?? ($emp['department']['name_kh'] ?? 'គ្មាននាយកដ្ឋាន');
+                                        @endphp
+                                        @if($currentSortBy === 'position_id' && $positionName !== $lastPositionName)
+                                            <tr class="position-group-row">
+                                                <td colspan="7">
+                                                    <strong><i class="bi bi-bookmark-fill me-1"></i>{{ $positionName }}</strong>
+                                                </td>
+                                            </tr>
+                                            @php $lastPositionName = $positionName; @endphp
+                                        @endif
+                                        @if($currentSortBy === 'department_id' && $nayokName !== $lastDepartmentName)
+                                            <tr class="position-group-row">
+                                                <td colspan="7">
+                                                    <strong><i class="bi bi-building me-1"></i>{{ $nayokName }}</strong>
+                                                </td>
+                                            </tr>
+                                            @php $lastDepartmentName = $nayokName; @endphp
+                                        @endif
+                                        <tr>
+                                            <td class="text-muted fw-medium">{{ $civilServants->firstItem() + $i }}</td>
+                                            <td>
+                                                @if($emp->images->isNotEmpty())
+                                                    @php
+                                                        $avatarColor = $avatarColors[$i % count($avatarColors)];
+                                                        $initial = mb_substr($fullName, 0, 1);
+                                                        $imageName = $emp->images->first()->name;
+                                                        $photoSrc = $photoBaseUrl
+                                                            ? $photoBaseUrl . '/' . $imageName
+                                                            : route('civil-servants.show-photo', $emp->id);
+                                                    @endphp
+                                                    <img src="{{ $photoSrc }}"
+                                                         alt="{{ $fullName }}"
+                                                         class="emp-avatar"
+                                                         style="width:40px;height:40px;border-radius:50%;object-fit:cover;"
+                                                         onerror="this.outerHTML='<span class=\'emp-avatar\' style=\'background:{{ $avatarColor }}\'>{{ $initial }}</span>'">
+                                                @else
+                                                    <span class="emp-avatar" style="background:{{ $avatarColors[$i % count($avatarColors)] }}">
+                                                        {{ mb_substr($fullName, 0, 1) }}
+                                                    </span>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                <span class="emp-name">{{ $fullName }}</span>
+                                            </td>
+                                            <td>{{ $emp['gender_id'] == 1 ? 'ប្រុស' : 'ស្រី' }}</td>
+                                            <td>{{ $emp['position']['name_kh'] ?? $emp['position']['name_short'] ?? $emp['position']['abb'] ?? 'N/A' }}</td>
+                                            <td>{{ $emp['department']['name_kh'] ?? 'N/A' }}</td>
+                                            <td>
+                                                @if($emp->images->isNotEmpty())
+                                                    <a href="{{ route('civil-servants.download-photo', $emp->id) }}" class="btn btn-sm btn-outline-primary">
+                                                        <i class="bi bi-download me-1"></i> ទាញយក
+                                                    </a>
+                                                @else
+                                                    <span class="no-photo"><i class="bi bi-image"></i> គ្មានរូបថត</span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {{-- Pagination --}}
+                        @if($civilServants->hasPages())
+                        <div class="pagination-wrapper">
+                            <div class="pagination-controls">
+                                {{ $civilServants->links() }}
+                            </div>
+                        </div>
+                        @endif
+                    @else
+                        <div class="empty-state">
+                            <div class="empty-state-icon"><i class="bi bi-person-slash"></i></div>
+                            <h5>រកមិនឃើញមន្រ្តីរាជការ</h5>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        @else
+            {{-- Initial state before search --}}
+            <div class="mt-4 mb-4">
+                <div class="app-card">
+                    <div class="empty-state">
+                        <div class="empty-state-icon"><i class="bi bi-search"></i></div>
+                        <h5>Search for civil servants</h5>
+                        <p>Use the filters above to find civil servants by name or department.</p>
+                    </div>
+                </div>
+            </div>
+        @endif
+        </div>
+    @endsection
+
+    @push('scripts')
+    <script>
+    (function() {
+        const nameInput = document.getElementById('name');
+        const deptSelect = document.getElementById('department_id');
+        const posSelect = document.getElementById('position_id');
+        const sortByInput = document.getElementById('sort_by');
+        const sortDirInput = document.getElementById('sort_dir');
+        const resultsContainer = document.getElementById('results-container');
+        const searchForm = document.getElementById('search-form');
+        const avatarColors = ['#4f46e5','#7c3aed','#2563eb','#0891b2','#059669','#d97706','#dc2626','#db2777'];
+        const perPage = 20;
+        const photoBaseUrl = '{{ $photoBaseUrl ?? '' }}';
+        let debounceTimer;
+        let allCivilServants = [];
+        let currentPage = 1;
+        let currentDeptId = '';
+        let currentPosId = '';
+        let currentSortBy = sortByInput.value || 'position_id';
+        let currentSortDir = sortDirInput.value || 'asc';
+
+        // Sort column click handler (server-side via form submit)
+        document.querySelectorAll('.sortable-th').forEach(function(th) {
+            th.style.cursor = 'pointer';
+            th.addEventListener('click', function() {
+                const col = this.getAttribute('data-sort');
+                if (currentSortBy === col) {
+                    currentSortDir = currentSortDir === 'asc' ? 'desc' : 'asc';
+                } else {
+                    currentSortBy = col;
+                    currentSortDir = 'asc';
+                }
+                sortByInput.value = currentSortBy;
+                sortDirInput.value = currentSortDir;
+                searchForm.submit();
+            });
+        });
+
+        searchForm.addEventListener('submit', function(e) {
+            // Allow normal form submit for server-side search+sort
+        });
+
+        nameInput.addEventListener('input', function() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(function() { currentPage = 1; fetchCivilServants(); }, 300);
+        });
+
+        deptSelect.addEventListener('change', function() { currentPage = 1; fetchCivilServants(); });
+        posSelect.addEventListener('change', function() { currentPage = 1; fetchCivilServants(); });
+
+        function fetchCivilServants() {
+            const params = new URLSearchParams();
+            const name = nameInput.value.trim();
+            currentDeptId = deptSelect.value;
+            currentPosId = posSelect.value;
+
+            if (name) params.append('name_kh', name);
+            if (currentDeptId) params.append('department_id', currentDeptId);
+            if (currentPosId) params.append('position_id', currentPosId);
+            params.append('sort_by', currentSortBy);
+            params.append('sort_dir', currentSortDir);
+
+            fetch('{{ route("civil-servants.ajax-search") }}?' + params.toString())
+                .then(r => r.json())
+                .then(function(civilServants) {
+                    allCivilServants = civilServants || [];
+                    renderPage();
+                })
+                .catch(() => {
+                    resultsContainer.innerHTML = `
+                        <div class="mt-4 mb-4"><div class="app-card"><div class="empty-state">
+                            <div class="empty-state-icon"><i class="bi bi-exclamation-triangle"></i></div>
+                            <h5>កំហុសក្នុងការទាញយកទិន្នន័យ</h5>
+                            <p>សូមពិនិត្យការតភ្ជាប់ហើយព្យាយាមម្តងទៀត។</p>
+                        </div></div></div>`;
+                });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function sortIcon(col) {
+            if (currentSortBy === col) {
+                return currentSortDir === 'asc'
+                    ? '<i class="bi bi-chevron-up"></i>'
+                    : '<i class="bi bi-chevron-down"></i>';
+            }
+            return '<i class="bi bi-chevron-expand text-muted"></i>';
+        }
+
+        function renderPage() {
+            const total = allCivilServants.length;
+            const totalPages = Math.ceil(total / perPage);
+            if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+            const start = (currentPage - 1) * perPage;
+            const pageItems = allCivilServants.slice(start, start + perPage);
+
+            if (total === 0) {
+                resultsContainer.innerHTML = `
+                    <div class="mt-4 mb-4"><div class="app-card">
+                        <div class="card-header-custom">
+                            <span class="result-count"><i class="bi bi-people"></i> 0 មន្រ្តីរាជការរកឃើញ</span>
+                        </div>
+                        <div class="empty-state">
+                            <div class="empty-state-icon"><i class="bi bi-person-slash"></i></div>
+                            <h5>រកមិនឃើញមន្រ្តីរាជការ</h5>
+                            <p>សូមកែប្រែលក្ខខណ្ឌស្វែងរក។</p>
+                        </div>
+                    </div></div>`;
+                return;
+            }
+
+            let downloadBtn = '';
+            if (currentDeptId) {
+                downloadBtn = `<a href="/civil-servants/download-department/${encodeURIComponent(currentDeptId)}" class="btn btn-success-custom">
+                    <i class="bi bi-file-earmark-zip me-1"></i> ទាញយករូបថតតាមនាយកដ្ឋាន</a>`;
+            } else {
+                downloadBtn = `<a href="/civil-servants/download-department/7" class="btn btn-success-custom">
+                    <i class="bi bi-file-earmark-zip me-1"></i> ទាញយករូបថតទាំងអស់</a>`;
+            }
+
+            let rows = '';
+            let lastPositionName = null;
+            pageItems.forEach(function(emp, i) {
+                const globalIndex = start + i + 1;
+                const color = avatarColors[(start + i) % avatarColors.length];
+                const initial = emp.last_name_kh ? escapeHtml(emp.last_name_kh.charAt(0)) : '?';
+                const name = escapeHtml((emp.last_name_kh || '') + ' ' + (emp.first_name_kh || '')).trim();
+                const sex = emp.gender_id == 1 ? '\u1794\u17d2\u179a\u17bb\u179f' : '\u179f\u17d2\u179a\u17b8';
+                const title = emp.position ? escapeHtml(emp.position.name_kh || emp.position.name_short || emp.position.abb || 'N/A') : 'N/A';
+                const deptName = emp.department ? escapeHtml(emp.department.name_kh || 'N/A') : 'N/A';
+
+                // Position group header row
+                if (currentSortBy === 'position_id' && title !== lastPositionName) {
+                    rows += `<tr class="position-group-row">
+                        <td colspan="7"><strong><i class="bi bi-bookmark-fill me-1"></i>${title}</strong></td>
+                    </tr>`;
+                    lastPositionName = title;
+                }
+
+                // Department group header row
+                if (currentSortBy === 'department_id' && deptName !== lastPositionName) {
+                    rows += `<tr class="position-group-row">
+                        <td colspan="7"><strong><i class="bi bi-building me-1"></i>${deptName}</strong></td>
+                    </tr>`;
+                    lastPositionName = deptName;
+                }
+
+                const hasPhoto = emp.images && emp.images.length > 0;
+                const imageName = hasPhoto ? emp.images[0].name : '';
+                const photoSrc = hasPhoto
+                    ? (photoBaseUrl ? photoBaseUrl + '/' + encodeURIComponent(imageName) : '/civil-servants/photo/' + encodeURIComponent(emp.id))
+                    : '';
+                const photoCell = hasPhoto
+                    ? `<a href="/civil-servants/download-photo/${encodeURIComponent(emp.id)}" class="btn btn-sm btn-outline-primary"><i class="bi bi-download me-1"></i> ទាញយក</a>`
+                    : `<span class="no-photo"><i class="bi bi-image"></i> គ្មានរូបថត</span>`;
+
+                const fallbackAvatar = `<span class="emp-avatar" style="background:${color}">${initial}</span>`;
+                const avatarHtml = hasPhoto
+                    ? `<img src="${photoSrc}" alt="${name}" class="emp-avatar" style="width:40px;height:40px;border-radius:50%;object-fit:cover;" onerror="this.outerHTML=this.dataset.fallback" data-fallback="${fallbackAvatar.replace(/"/g, '&quot;')}">`
+                    : fallbackAvatar;
+
+                rows += `<tr>
+                    <td class="text-muted fw-medium">${globalIndex}</td>
+                    <td>${avatarHtml}</td>
+                    <td><span class="emp-name">${name}</span></td>
+                    <td>${sex}</td>
+                    <td>${title}</td>
+                    <td>${deptName}</td>
+                    <td>${photoCell}</td>
+                </tr>`;
+            });
+
+            let paginationHtml = '';
+            if (totalPages > 1) {
+                paginationHtml = `<div class="pagination-wrapper">
+                    <div class="pagination-controls"><nav><ul class="pagination">`;
+
+                paginationHtml += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                    <a class="page-link" href="#" data-page="${currentPage - 1}">&laquo;</a></li>`;
+
+                let startP = Math.max(1, currentPage - 2);
+                let endP = Math.min(totalPages, currentPage + 2);
+                if (startP > 1) {
+                    paginationHtml += `<li class="page-item"><a class="page-link" href="#" data-page="1">1</a></li>`;
+                    if (startP > 2) paginationHtml += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+                }
+                for (let p = startP; p <= endP; p++) {
+                    paginationHtml += `<li class="page-item ${p === currentPage ? 'active' : ''}">
+                        <a class="page-link" href="#" data-page="${p}">${p}</a></li>`;
+                }
+                if (endP < totalPages) {
+                    if (endP < totalPages - 1) paginationHtml += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+                    paginationHtml += `<li class="page-item"><a class="page-link" href="#" data-page="${totalPages}">${totalPages}</a></li>`;
+                }
+
+                paginationHtml += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+                    <a class="page-link" href="#" data-page="${currentPage + 1}">&raquo;</a></li>`;
+                paginationHtml += `</ul></nav></div></div>`;
+            }
+
+            resultsContainer.innerHTML = `
+                <div class="mt-4 mb-4"><div class="app-card">
+                    <div class="card-header-custom">
+                        <span class="result-count"><i class="bi bi-people"></i> ${total} មន្រ្តីរាជការរកឃើញ</span>
+                        ${downloadBtn}
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table-custom table">
+                            <thead><tr>
+                                <th style="width:60px">អត្តលេខ</th>
+                                <th>រូបថត</th>
+                                <th class="sortable-th-js" data-sort="last_name_kh">គោត្តនាម និងនាម ${sortIcon('last_name_kh')}</th>
+                                <th class="sortable-th-js" data-sort="gender_id">ភេទ ${sortIcon('gender_id')}</th>
+                                <th class="sortable-th-js" data-sort="position_id">មុខតំណែង ${sortIcon('position_id')}</th>
+                                <th class="sortable-th-js" data-sort="department_id">នាយកដ្ឋាន ${sortIcon('department_id')}</th>
+                                <th style="width:160px">ទាញយករូបថត</th>
+                            </tr></thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                    ${paginationHtml}
+                </div></div>`;
+
+            // Attach sort click handlers
+            resultsContainer.querySelectorAll('.sortable-th-js').forEach(function(th) {
+                th.style.cursor = 'pointer';
+                th.addEventListener('click', function() {
+                    const col = this.getAttribute('data-sort');
+                    if (currentSortBy === col) {
+                        currentSortDir = currentSortDir === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        currentSortBy = col;
+                        currentSortDir = 'asc';
+                    }
+                    sortByInput.value = currentSortBy;
+                    sortDirInput.value = currentSortDir;
+                    fetchCivilServants();
+                });
+            });
+
+            // Attach pagination click handlers
+            resultsContainer.querySelectorAll('.page-link[data-page]').forEach(function(link) {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const page = parseInt(this.getAttribute('data-page'));
+                    if (page >= 1 && page <= totalPages) {
+                        currentPage = page;
+                        renderPage();
+                        resultsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                });
+            });
+
+        }
+    })();
+    </script>
+    @endpush

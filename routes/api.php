@@ -1,18 +1,18 @@
 <?php
 
 use App\Http\Controllers\Api\DepartmentController;
-use App\Http\Controllers\Api\EmployeeController;
-use App\Http\Controllers\Api\TitleController;
+use App\Http\Controllers\Api\CivilServantController;
+use App\Http\Controllers\Api\PositionController;
 use Illuminate\Support\Facades\Route;
 
 // Departments
 Route::get('/departments', [DepartmentController::class, 'index']);
 
-// Titles
-Route::get('/titles', [TitleController::class, 'index']);
+// Positions
+Route::get('/positions', [PositionController::class, 'index']);
 
-// Employees
-Route::get('/employees', [EmployeeController::class, 'index']);
-Route::post('/employees', [EmployeeController::class, 'store']);
-Route::get('/employees/{employee}/photo', [EmployeeController::class, 'downloadPhoto']);
-Route::get('/employees/download-by-department/{department_id}', [EmployeeController::class, 'downloadByDepartment']);
+// Civil Servants
+Route::get('/civil-servants', [CivilServantController::class, 'index']);
+Route::post('/civil-servants', [CivilServantController::class, 'store']);
+Route::get('/civil-servants/{civil_servant}/download-photo', [CivilServantController::class, 'downloadPhoto']);
+Route::get('/civil-servants/download-by-department/{department_id}', [CivilServantController::class, 'downloadByDepartment']);

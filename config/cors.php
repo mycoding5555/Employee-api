@@ -3,7 +3,7 @@
 return [
     'paths' => ['api/*'],
     'allowed_methods' => ['*'],
-    'allowed_origins' => ['http://localhost:8001'],
+    'allowed_origins' => [env('FRONTEND_URL', 'http://localhost:8001')],
     'allowed_origins_patterns' => [],
     'allowed_headers' => ['*'],
     'exposed_headers' => ['Content-Disposition'],
