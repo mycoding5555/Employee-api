@@ -79,13 +79,20 @@
                             <i class="bi bi-people"></i> {{ $civilServants->total() }} មន្រ្តីរាជការរកឃើញ
                         </span>
 
+                        @php
+                            $deptIdForLink = $filters['department_id'] ?? 7;
+                            $deptForLink = \App\Models\Departments::find($deptIdForLink);
+                            $deptNameForFname = $deptForLink ? $deptForLink->name_kh : 'department_' . $deptIdForLink;
+                        @endphp
                         @if(isset($filters['department_id']) && $filters['department_id'])
                             <a href="{{ route('civil-servants.download-department', $filters['department_id']) }}"
+                               data-fname="{{ $deptNameForFname }}.zip"
                                class="btn btn-success-custom">
                                 <i class="bi bi-file-earmark-zip me-1"></i> ទាញយករូបថតតាមនាយកដ្ឋាន
                             </a>
                         @else
                             <a href="{{ route('civil-servants.download-department', 7) }}"
+                               data-fname="{{ $deptNameForFname }}.zip"
                                class="btn btn-success-custom">
                                 <i class="bi bi-file-earmark-zip me-1"></i> ទាញយករូបថតទាំងអស់
                             </a>
@@ -166,7 +173,7 @@
                                             </tr>
                                             @php $lastDepartmentName = $nayokName; @endphp
                                         @endif
-                                        <tr>
+                                        <tr data-download-url="{{ route('civil-servants.download-photo', $emp->id) }}">
                                             <td class="text-muted fw-medium">{{ $civilServants->firstItem() + $i }}</td>
                                             <td>
                                                 @if($emp->images->isNotEmpty())
@@ -197,7 +204,10 @@
                                             <td>{{ $emp['department']['name_kh'] ?? 'N/A' }}</td>
                                             <td>
                                                 @if($emp->images->isNotEmpty())
-                                                    <a href="{{ route('civil-servants.download-photo', $emp->id) }}" class="btn btn-sm btn-outline-primary">
+                                                    @php $imageName = $emp->images->first()->name; @endphp
+                                                    <a href="{{ route('civil-servants.download-photo', $emp->id) }}"
+                                                       data-fname="{{ $emp->last_name_kh }}_{{ $emp->first_name_kh }}_{{ $imageName }}"
+                                                       class="btn btn-sm btn-outline-primary">
                                                         <i class="bi bi-download me-1"></i> ទាញយក
                                                     </a>
                                                 @else
@@ -258,6 +268,7 @@
         let allCivilServants = [];
         let currentPage = 1;
         let currentDeptId = '';
+        let currentDeptName = '';
         let currentPosId = '';
         let currentSortBy = sortByInput.value || 'position_id';
         let currentSortDir = sortDirInput.value || 'asc';
@@ -295,6 +306,7 @@
             const params = new URLSearchParams();
             const name = nameInput.value.trim();
             currentDeptId = deptSelect.value;
+            currentDeptName = deptSelect.options[deptSelect.selectedIndex]?.text?.trim() || '';
             currentPosId = posSelect.value;
 
             if (name) params.append('name_kh', name);
@@ -318,6 +330,118 @@
                         </div></div></div>`;
                 });
         }
+
+        /* -------------------- Download single file with progress -------------------- */
+        function parseFilenameFromDisposition(disposition) {
+            if (!disposition) return null;
+            const filenameRegex = /filename\*=UTF-8''([^;\n]*)|filename="?([^";\n]*)"?/i;
+            const match = disposition.match(filenameRegex);
+            if (!match) return null;
+            return decodeURIComponent(match[1] || match[2]);
+        }
+
+        async function downloadWithProgress(url, suggestedName) {
+            const overlay = getOrCreateProgressOverlay();
+            overlay.show();
+
+            try {
+                const resp = await fetch(url, { credentials: 'same-origin' });
+                if (!resp.ok) throw new Error('Server returned ' + resp.status);
+
+                const contentLength = resp.headers.get('content-length');
+                const disposition = resp.headers.get('content-disposition');
+                const contentType = resp.headers.get('content-type') || 'application/octet-stream';
+                // Prefer the suggested filename (from data-fname) over server-provided name
+                const filename = suggestedName || parseFilenameFromDisposition(disposition) || 'download.bin';
+
+                if (!resp.body) {
+                    // Fallback: let browser handle
+                    overlay.hide();
+                    window.location = url;
+                    return;
+                }
+
+                const total = contentLength ? parseInt(contentLength, 10) : null;
+                const reader = resp.body.getReader();
+                const chunks = [];
+                let received = 0;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    chunks.push(value);
+                    received += value.length;
+                    if (total) {
+                        overlay.setProgress((received / total) * 100);
+                    } else {
+                        overlay.setIndeterminate();
+                    }
+                }
+
+                const blob = new Blob(chunks, { type: contentType });
+                const blobUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(blobUrl);
+                overlay.complete();
+            } catch (err) {
+                console.error(err);
+                alert('រកមិនឃើញឯកសារ ឬមានកំហុសក្នុងការទាញយក');
+                getOrCreateProgressOverlay().hide();
+            }
+        }
+
+        function getOrCreateProgressOverlay() {
+            let overlay = document.getElementById('download-progress-overlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.id = 'download-progress-overlay';
+                overlay.innerHTML = `
+                    <div class="dp-inner">
+                        <div class="dp-title">កំពុងទាញយក...</div>
+                        <div class="dp-bar"><div class="dp-fill" style="width:0%"></div></div>
+                        <div class="dp-percent">0%</div>
+                    </div>`;
+                document.body.appendChild(overlay);
+                const style = document.createElement('style');
+                style.textContent = `#download-progress-overlay{position:fixed;left:0;right:0;top:0;bottom:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.35);z-index:99999;visibility:hidden;opacity:0;transition:opacity .18s}#download-progress-overlay .dp-inner{background:#fff;padding:18px 22px;border-radius:8px;min-width:320px;max-width:90%;box-shadow:0 6px 24px rgba(2,6,23,.2);text-align:center}#download-progress-overlay .dp-title{font-weight:600;margin-bottom:8px}#download-progress-overlay .dp-bar{height:10px;background:#f1f5f9;border-radius:999px;overflow:hidden;margin:8px 0}#download-progress-overlay .dp-fill{height:100%;background:#10b981;width:0;transition:width .12s linear}#download-progress-overlay .dp-percent{font-size:13px;color:#334155;margin-top:6px}`;
+                document.head.appendChild(style);
+
+                overlay.show = function() { overlay.style.visibility = 'visible'; overlay.style.opacity = '1'; overlay.querySelector('.dp-fill').style.width = '0%'; overlay.querySelector('.dp-percent').textContent = '0%'; overlay.querySelector('.dp-title').textContent = 'កំពុងទាញយក...'; };
+                overlay.hide = function() { overlay.style.opacity = '0'; setTimeout(() => { overlay.style.visibility = 'hidden'; }, 200); };
+                overlay.setProgress = function(p) { const pct = Math.min(100, Math.max(0, Math.round(p))); overlay.querySelector('.dp-fill').style.width = pct + '%'; overlay.querySelector('.dp-percent').textContent = pct + '%'; };
+                overlay.setIndeterminate = function() { overlay.querySelector('.dp-fill').style.width = '60%'; overlay.querySelector('.dp-percent').textContent = '...'; };
+                overlay.setTitle = function(t) { overlay.querySelector('.dp-title').textContent = t; };
+                overlay.complete = function() { overlay.setProgress(100); overlay.setTitle('រួចរាល់!'); setTimeout(() => overlay.hide(), 600); };
+            }
+            return overlay;
+        }
+
+        // Intercept download links
+        document.addEventListener('click', function(e) {
+            const el = e.target.closest('a');
+            if (!el) return;
+            const href = el.getAttribute('href') || '';
+
+            // Individual photo download
+            if (href.includes('/civil-servants/download-photo/')) {
+                e.preventDefault();
+                const suggested = el.getAttribute('data-fname') || null;
+                downloadWithProgress(href, suggested);
+                return;
+            }
+
+            // Department download — ZIP with folder inside
+            if (href.includes('/civil-servants/download-department/')) {
+                e.preventDefault();
+                const suggested = el.getAttribute('data-fname') || null;
+                downloadWithProgress(href, suggested);
+            }
+        });
 
         function escapeHtml(text) {
             const div = document.createElement('div');
@@ -357,13 +481,10 @@
             }
 
             let downloadBtn = '';
-            if (currentDeptId) {
-                downloadBtn = `<a href="/civil-servants/download-department/${encodeURIComponent(currentDeptId)}" class="btn btn-success-custom">
+            const deptForLink = currentDeptId || '7';
+            const suggestedDeptName = (currentDeptName || 'department_' + deptForLink) + '.zip';
+            downloadBtn = `<a href="/civil-servants/download-department/${encodeURIComponent(deptForLink)}" data-fname="${suggestedDeptName}" class="btn btn-success-custom">
                     <i class="bi bi-file-earmark-zip me-1"></i> ទាញយករូបថតតាមនាយកដ្ឋាន</a>`;
-            } else {
-                downloadBtn = `<a href="/civil-servants/download-department/7" class="btn btn-success-custom">
-                    <i class="bi bi-file-earmark-zip me-1"></i> ទាញយករូបថតទាំងអស់</a>`;
-            }
 
             let rows = '';
             let lastPositionName = null;
@@ -398,7 +519,7 @@
                     ? (photoBaseUrl ? photoBaseUrl + '/' + encodeURIComponent(imageName) : '/civil-servants/photo/' + encodeURIComponent(emp.id))
                     : '';
                 const photoCell = hasPhoto
-                    ? `<a href="/civil-servants/download-photo/${encodeURIComponent(emp.id)}" class="btn btn-sm btn-outline-primary"><i class="bi bi-download me-1"></i> ទាញយក</a>`
+                    ? `<a href="/civil-servants/download-photo/${encodeURIComponent(emp.id)}" data-fname="${name.replace(/\s+/g,'_')}_photo.jpg" class="btn btn-sm btn-outline-primary"><i class="bi bi-download me-1"></i> ទាញយក</a>`
                     : `<span class="no-photo"><i class="bi bi-image"></i> គ្មានរូបថត</span>`;
 
                 const fallbackAvatar = `<span class="emp-avatar" style="background:${color}">${initial}</span>`;
@@ -406,7 +527,7 @@
                     ? `<img src="${photoSrc}" alt="${name}" class="emp-avatar" style="width:40px;height:40px;border-radius:50%;object-fit:cover;" onerror="this.outerHTML=this.dataset.fallback" data-fallback="${fallbackAvatar.replace(/"/g, '&quot;')}">`
                     : fallbackAvatar;
 
-                rows += `<tr>
+                rows += `<tr data-download-url="/civil-servants/download-photo/${encodeURIComponent(emp.id)}">
                     <td class="text-muted fw-medium">${globalIndex}</td>
                     <td>${avatarHtml}</td>
                     <td><span class="emp-name">${name}</span></td>

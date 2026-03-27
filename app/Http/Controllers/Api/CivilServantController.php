@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Civil_servants;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use ZipArchive;
 
@@ -100,39 +101,70 @@ class CivilServantController extends Controller
         }
 
         $photoBaseUrl = rtrim(env('PHOTO_BASE_URL', ''), '/');
+        $hrmisBase = rtrim(env('HRMIS_PHOTO_BASE', 'https://mef-pd.net/hrmis/api/profile_image'), '/');
         $tempFiles = [];
         $addedFiles = 0;
         foreach ($civilServants as $civilServant) {
-            foreach ($civilServant->images as $image) {
-                $entryName = $civilServant->last_name_kh . '_' . $civilServant->first_name_kh . '_' . $image->name;
-                $added = false;
+            $image = $civilServant->images->first();
+            if (!$image) continue;
 
-                // Position subfolder first, then flat
-                $positionName = $civilServant->position->name_kh ?? null;
-                $possiblePaths = [];
-                if ($positionName) {
-                    $possiblePaths[] = 'photos/' . $positionName . '/' . $image->name;
+            $baseName = $civilServant->last_name_kh . '_' . $civilServant->first_name_kh;
+            $entryName = $baseName . '_' . $image->name;
+            $added = false;
+
+            // Position subfolder first, then flat
+            $positionName = $civilServant->position->name_kh ?? null;
+            $possiblePaths = [];
+            if ($positionName) {
+                $possiblePaths[] = 'photos/' . $positionName . '/' . $image->name;
+            }
+            $possiblePaths[] = 'photos/' . $image->name;
+            $possiblePaths[] = $image->name;
+            foreach ($possiblePaths as $path) {
+                if (Storage::disk('public')->exists($path)) {
+                    $zip->addFile(Storage::disk('public')->path($path), $entryName);
+                    $addedFiles++;
+                    $added = true;
+                    break;
                 }
-                $possiblePaths[] = 'photos/' . $image->name;
-                $possiblePaths[] = $image->name;
-                foreach ($possiblePaths as $path) {
-                    if (Storage::disk('public')->exists($path)) {
-                        $zip->addFile(Storage::disk('public')->path($path), $entryName);
-                        $addedFiles++;
-                        $added = true;
-                        break;
-                    }
+            }
+
+            // Try HRMIS endpoint by civil servant ID
+            if (!$added && $hrmisBase) {
+                try {
+                    $remote = Http::timeout(10)->get($hrmisBase . '/' . rawurlencode($civilServant->id));
+                } catch (\Exception $e) {
+                    $remote = null;
                 }
 
-                if (!$added && $photoBaseUrl) {
-                    $contents = @file_get_contents($photoBaseUrl . '/' . $image->name);
-                    if ($contents !== false) {
-                        $tempFile = tempnam(sys_get_temp_dir(), 'dept_photo_');
-                        file_put_contents($tempFile, $contents);
-                        $zip->addFile($tempFile, $entryName);
-                        $tempFiles[] = $tempFile;
-                        $addedFiles++;
-                    }
+                if ($remote && $remote->successful() && $remote->body() !== '') {
+                    $ct = $remote->header('Content-Type', 'image/jpeg');
+                    $ext = match (true) {
+                        str_contains($ct, 'png')  => '.png',
+                        str_contains($ct, 'gif')  => '.gif',
+                        str_contains($ct, 'webp') => '.webp',
+                        default                    => '.jpg',
+                    };
+                    $zipEntryName = $baseName . $ext;
+
+                    $tempFile = tempnam(sys_get_temp_dir(), 'dept_photo_');
+                    file_put_contents($tempFile, $remote->body());
+                    $zip->addFile($tempFile, $zipEntryName);
+                    $tempFiles[] = $tempFile;
+                    $addedFiles++;
+                    $added = true;
+                }
+            }
+
+            // Fallback: try PHOTO_BASE_URL with image filename
+            if (!$added && $photoBaseUrl) {
+                $contents = @file_get_contents($photoBaseUrl . '/' . rawurlencode($image->name));
+                if ($contents !== false) {
+                    $tempFile = tempnam(sys_get_temp_dir(), 'dept_photo_');
+                    file_put_contents($tempFile, $contents);
+                    $zip->addFile($tempFile, $entryName);
+                    $tempFiles[] = $tempFile;
+                    $addedFiles++;
                 }
             }
         }
