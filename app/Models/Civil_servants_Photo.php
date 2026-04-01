@@ -5,27 +5,9 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
-class Civil_servants extends Model
+class Civil_servants_Photo extends Model
 {
     protected $table = 'civil_servants';
-
-    /**
-     * Scope all queries to អគ្គលេខាធិការដ្ឋាន and its child នាយកដ្ឋាន
-     */
-    protected static function booted(): void
-    {
-        static::addGlobalScope('department', function (Builder $builder) {
-            $childIds = Departments::where('parent_id', 7)->pluck('id');
-            $grandchildIds = Departments::whereIn('parent_id', $childIds)->pluck('id');
-            $departmentIds = $childIds->merge($grandchildIds)->push(7)->toArray();
-            $builder->whereIn('civil_servants.department_id', $departmentIds);
-        });
-
-        static::addGlobalScope('active', function (Builder $builder) {
-            $builder->where('civil_servants.status_type_id', 1);
-        });
-    }
-
     protected $keyType = 'string';
     public $incrementing = false;
 

@@ -35,4 +35,12 @@ return [
         ],
     ],
 
+    'hrmis' => [
+        // Base URL for legacy photo filenames (e.g. http://10.0.129.214/storage/photos)
+        'photo_base_url' => env('PHOTO_BASE_URL', ''),
+        // API endpoint that serves profile images by civil servant ID
+        // e.g. https://mef-pd.net/hrmis/api/profile_image
+        'photo_api_base' => env('HRMIS_PHOTO_BASE', 'https://mef-pd.net/hrmis/api/profile_image'),
+    ],
+
 ];

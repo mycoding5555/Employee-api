@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Civil_servants;
+use App\Models\Civil_servants_Photo;
 use App\Models\Departments;
 use App\Models\Positions;
 
@@ -10,12 +10,12 @@ class DashboardController extends Controller
 {
     public function index()
     {
-        $totalStaff = Civil_servants::count();
+        $totalStaff = Civil_servants_Photo::count();
         $totalDepartments = Departments::where('id', 7)->orWhere('parent_id', 7)->count();
         $totalPositions = Positions::whereHas('civilServants')->count();
 
-        $maleCount = Civil_servants::where('gender_id', 1)->count();
-        $femaleCount = Civil_servants::where('gender_id', 2)->count();
+        $maleCount = Civil_servants_Photo::where('gender_id', 1)->count();
+        $femaleCount = Civil_servants_Photo::where('gender_id', 2)->count();
 
         // Sub-departments under អគ្គលេខាធិការដ្ឋាន by staff count
         $topDepartments = Departments::where('id', 7)->orWhere('parent_id', 7)
@@ -32,13 +32,13 @@ class DashboardController extends Controller
             ->get();
 
         // Recent employees (latest 5)
-        $recentEmployees = Civil_servants::with(['department', 'position'])
+        $recentEmployees = Civil_servants_Photo::with(['department', 'position'])
             ->orderByDesc('created_at')
             ->limit(5)
             ->get();
 
         // Staff with photos vs without
-        $withPhoto = Civil_servants::whereHas('images')->count();
+        $withPhoto = Civil_servants_Photo::whereHas('images')->count();
         $withoutPhoto = $totalStaff - $withPhoto;
 
         // Pre-build chart data arrays for JS

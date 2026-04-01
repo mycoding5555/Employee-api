@@ -14,7 +14,7 @@
                         <input type="hidden" name="sort_dir" id="sort_dir" value="{{ $filters['sort_dir'] ?? 'asc' }}">
                         <div class="mb-2">
                             <span class="badge bg-primary" style="font-size:0.9rem;">
-                                <i class="bi bi-building me-1"></i> {{ $department->name_kh ?? 'អគ្គលេខាធិការដ្ឋាន' }}
+                                <i class="bi bi-building me-1"></i> {{ $filters['name_kh'] ?? 'អគ្គនាយកដ្ឋានទាំងអស់' }}
                             </span>
                         </div>
                         <div class="row g-3 align-items-end">
@@ -30,17 +30,32 @@
                                            style="border-left:none; border-radius:0 8px 8px 0;">
                                 </div>
                             </div>
+
+                            <div class="col-md-3">
+                                <label for="general_department_id" class="form-label-custom">អគ្គនាយកដ្ឋាន</label>
+                                <select class="form-select" id="general_department_id" name="general_department_id">
+                                    <option value="">អគ្គនាយកដ្ឋានទាំងអស់</option>
+                                    @foreach($subDepartments as $sub)
+                                        <option value="{{ $sub->id }}"
+                                            {{ (isset($filters['general_department_id']) && $filters['general_department_id'] == $sub->id) ? 'selected' : '' }}>
+                                            {{ $sub->name_kh }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+
                             <div class="col-md-3">
                                 <label for="department_id" class="form-label-custom">នាយកដ្ឋាន</label>
                                 <select class="form-select" id="department_id" name="department_id">
                                     <option value="">នាយកដ្ឋានទាំងអស់</option>
-                                    <option value="7" {{ (isset($filters['department_id']) && $filters['department_id'] == 7) ? 'selected' : '' }}>អគ្គលេខាធិការដ្ឋាន</option>
-                                    @foreach($subDepartments as $sub)
-                                        <option value="{{ $sub->id }}"
-                                            {{ (isset($filters['department_id']) && $filters['department_id'] == $sub->id) ? 'selected' : '' }}>
-                                            {{ $sub->name_kh }}
-                                        </option>
-                                    @endforeach
+                                    @if(isset($childDepartments))
+                                        @foreach($childDepartments as $child)
+                                            <option value="{{ $child->id }}"
+                                                {{ (isset($filters['department_id']) && $filters['department_id'] == $child->id) ? 'selected' : '' }}>
+                                                {{ $child->name_kh }}
+                                            </option>
+                                        @endforeach
+                                    @endif
                                 </select>
                             </div>
                             <div class="col-md-3">
@@ -255,6 +270,7 @@
     <script>
     (function() {
         const nameInput = document.getElementById('name');
+        const generalDeptSelect = document.getElementById('general_department_id');
         const deptSelect = document.getElementById('department_id');
         const posSelect = document.getElementById('position_id');
         const sortByInput = document.getElementById('sort_by');
@@ -264,6 +280,7 @@
         const avatarColors = ['#4f46e5','#7c3aed','#2563eb','#0891b2','#059669','#d97706','#dc2626','#db2777'];
         const perPage = 20;
         const photoBaseUrl = '{{ $photoBaseUrl ?? '' }}';
+        const deptChildrenMap = @json($allChildDepts);
         let debounceTimer;
         let allCivilServants = [];
         let currentPage = 1;
@@ -272,6 +289,40 @@
         let currentPosId = '';
         let currentSortBy = sortByInput.value || 'position_id';
         let currentSortDir = sortDirInput.value || 'asc';
+
+        // Cascade: when អគ្គនាយកដ្ឋាន changes, fetch children for នាយកដ្ឋាន
+        generalDeptSelect.addEventListener('change', function() {
+            const parentId = this.value;
+            deptSelect.innerHTML = '<option value="">នាយកដ្ឋានទាំងអស់</option>';
+            deptSelect.disabled = true;
+            // Reset position dropdown when general department changes
+            posSelect.innerHTML = '<option value="">មុខតំណែងទាំងអស់</option>';
+
+            if (!parentId) {
+                deptSelect.disabled = false;
+                currentPage = 1;
+                fetchCivilServants();
+                return;
+            }
+
+            const children = deptChildrenMap[parentId] || [];
+            children.forEach(function(dept) {
+                const opt = document.createElement('option');
+                opt.value = dept.id;
+                opt.textContent = dept.name_kh;
+                deptSelect.appendChild(opt);
+            });
+            deptSelect.disabled = false;
+            currentPage = 1;
+            fetchCivilServants();
+        });
+
+        // Cascade: when នាយកដ្ឋាន changes, fetch civil servants then populate positions from results
+        deptSelect.addEventListener('change', function() {
+            posSelect.innerHTML = '<option value="">មុខតំណែងទាំងអស់</option>';
+            currentPage = 1;
+            fetchCivilServants(true);
+        });
 
         // Sort column click handler (server-side via form submit)
         document.querySelectorAll('.sortable-th').forEach(function(th) {
@@ -299,29 +350,58 @@
             debounceTimer = setTimeout(function() { currentPage = 1; fetchCivilServants(); }, 300);
         });
 
-        deptSelect.addEventListener('change', function() { currentPage = 1; fetchCivilServants(); });
         posSelect.addEventListener('change', function() { currentPage = 1; fetchCivilServants(); });
 
-        function fetchCivilServants() {
+        function fetchCivilServants(rebuildPositions) {
             const params = new URLSearchParams();
             const name = nameInput.value.trim();
             currentDeptId = deptSelect.value;
             currentDeptName = deptSelect.options[deptSelect.selectedIndex]?.text?.trim() || '';
             currentPosId = posSelect.value;
+            const generalDeptId = generalDeptSelect.value;
 
             if (name) params.append('name_kh', name);
-            if (currentDeptId) params.append('department_id', currentDeptId);
+            if (currentDeptId) {
+                params.append('department_id', currentDeptId);
+            } else if (generalDeptId) {
+                params.append('general_department_id', generalDeptId);
+            }
             if (currentPosId) params.append('position_id', currentPosId);
             params.append('sort_by', currentSortBy);
             params.append('sort_dir', currentSortDir);
 
             fetch('{{ route("civil-servants.ajax-search") }}?' + params.toString())
-                .then(r => r.json())
+                .then(function(r) {
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.json();
+                })
                 .then(function(civilServants) {
-                    allCivilServants = civilServants || [];
+                    allCivilServants = Array.isArray(civilServants) ? civilServants : [];
+
+                    // Rebuild position dropdown from fetched civil servants
+                    if (rebuildPositions) {
+                        const seen = {};
+                        const positions = [];
+                        allCivilServants.forEach(function(emp) {
+                            if (emp.position && !seen[emp.position.id]) {
+                                seen[emp.position.id] = true;
+                                positions.push(emp.position);
+                            }
+                        });
+                        positions.sort(function(a, b) { return (a.sort || 0) - (b.sort || 0); });
+                        posSelect.innerHTML = '<option value="">មុខតំណែងទាំងអស់</option>';
+                        positions.forEach(function(pos) {
+                            const opt = document.createElement('option');
+                            opt.value = pos.id;
+                            opt.textContent = pos.name_kh || pos.name_short || pos.abb;
+                            posSelect.appendChild(opt);
+                        });
+                    }
+
                     renderPage();
                 })
-                .catch(() => {
+                .catch(function(err) {
+                    console.error('fetchCivilServants error:', err, 'URL:', '{{ route("civil-servants.ajax-search") }}?' + params.toString());
                     resultsContainer.innerHTML = `
                         <div class="mt-4 mb-4"><div class="app-card"><div class="empty-state">
                             <div class="empty-state-icon"><i class="bi bi-exclamation-triangle"></i></div>

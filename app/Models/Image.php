@@ -13,6 +13,6 @@ class Image extends Model
 
     public function civilServant()
     {
-        return $this->belongsTo(Civil_servants::class, 'civil_servant_id');
+        return $this->belongsTo(Civil_servants_Photo::class, 'civil_servant_id');
     }
 }

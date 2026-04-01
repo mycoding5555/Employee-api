@@ -34,7 +34,7 @@ class Departments extends Model
 
     public function civilServants()
     {
-        return $this->hasMany(Civil_servants::class, 'department_id');
+        return $this->hasMany(Civil_servants_Photo::class, 'department_id');
     }
 
     public function parent()

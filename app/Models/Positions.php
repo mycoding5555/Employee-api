@@ -28,6 +28,6 @@ class Positions extends Model
 
     public function civilServants()
     {
-        return $this->hasMany(Civil_servants::class, 'position_id');
+        return $this->hasMany(Civil_servants_Photo::class, 'position_id');
     }
 }
