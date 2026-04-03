@@ -2,13 +2,16 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Civil_servants_Photo extends Model
+class CivilServant extends Model
 {
     protected $table = 'civil_servants';
+
     protected $keyType = 'string';
+
     public $incrementing = false;
 
     protected $fillable = [
@@ -42,17 +45,17 @@ class Civil_servants_Photo extends Model
         'status_type_date' => 'date',
     ];
 
-    public function position()
+    public function position(): BelongsTo
     {
-        return $this->belongsTo(Positions::class, 'position_id');
+        return $this->belongsTo(Position::class, 'position_id');
     }
 
-    public function department()
+    public function department(): BelongsTo
     {
-        return $this->belongsTo(Departments::class, 'department_id');
+        return $this->belongsTo(Department::class, 'department_id');
     }
 
-    public function images()
+    public function images(): HasMany
     {
         return $this->hasMany(Image::class, 'civil_servant_id');
     }

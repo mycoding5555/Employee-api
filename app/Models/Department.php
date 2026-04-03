@@ -3,8 +3,10 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Departments extends Model
+class Department extends Model
 {
     protected $fillable = [
         'prefix',
@@ -32,18 +34,18 @@ class Departments extends Model
         'province_id',
     ];
 
-    public function civilServants()
+    public function civilServants(): HasMany
     {
-        return $this->hasMany(Civil_servants_Photo::class, 'department_id');
+        return $this->hasMany(CivilServant::class, 'department_id');
     }
 
-    public function parent()
+    public function parent(): BelongsTo
     {
-        return $this->belongsTo(Departments::class, 'parent_id');
+        return $this->belongsTo(Department::class, 'parent_id');
     }
 
-    public function children()
+    public function children(): HasMany
     {
-        return $this->hasMany(Departments::class, 'parent_id');
+        return $this->hasMany(Department::class, 'parent_id');
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Image extends Model
 {
@@ -11,8 +12,8 @@ class Image extends Model
         'name',
     ];
 
-    public function civilServant()
+    public function civilServant(): BelongsTo
     {
-        return $this->belongsTo(Civil_servants_Photo::class, 'civil_servant_id');
+        return $this->belongsTo(CivilServant::class, 'civil_servant_id');
     }
 }

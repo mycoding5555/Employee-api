@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Civil_servants_Photo;
-use App\Models\Departments;
-use App\Models\Positions;
+use App\Models\CivilServant;
+use App\Models\Department;
+use App\Models\Position;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -15,10 +15,10 @@ use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use ZipArchive;
+use ZipStream\ZipStream;
 
 class CivilServantPhotoController extends Controller
 {
-
     private const ALLOWED_SORTS = [
         'last_name_kh',
         'first_name_kh',
@@ -28,44 +28,41 @@ class CivilServantPhotoController extends Controller
         'sort',
     ];
 
-    public function index(Request $request)
+    public function index(Request $request): \Illuminate\View\View|JsonResponse
     {
         $filters = $request->only(['name_kh', 'department_id', 'position_id', 'sort_by', 'sort_dir']);
 
-        $query = Civil_servants_Photo::with(['department', 'position', 'images']);
+        $query = CivilServant::with(['department', 'position', 'images']);
         $this->applyFilters($query, $request);
         $this->applySorting($query, $request);
 
-                // fetch អគ្គនាយកដ្ឋាន for first dropdown
-                $baseDepartments = Departments::where(function ($q) {
-                        $q->whereIn('parent_id', [1, 2])
-                          ->orWhereIn('id', [1, 2]);
-                    });
+        $baseDepartments = Department::where(function ($q) {
+            $q->whereIn('parent_id', [1, 2])
+              ->orWhereIn('id', [1, 2]);
+        });
 
-                // Apply special ordering: id=1 group first, id=2 group last
-                $departments = $baseDepartments
-                    ->orderByRaw('CASE WHEN id = ? OR parent_id = ? THEN 0 WHEN id = ? OR parent_id = ? THEN 2 ELSE 1 END ASC', [1, 1, 2, 2])
-                    ->orderByRaw('CASE WHEN id IN (?, ?) THEN 0 ELSE 1 END ASC', [1, 2])
-                    ->orderByRaw('COALESCE(`sort`, id) ASC')
-                    ->get();
+        $departments = $baseDepartments
+            ->orderByRaw('CASE WHEN id = ? OR parent_id = ? THEN 0 WHEN id = ? OR parent_id = ? THEN 2 ELSE 1 END ASC', [1, 1, 2, 2])
+            ->orderByRaw('CASE WHEN id IN (?, ?) THEN 0 ELSE 1 END ASC', [1, 2])
+            ->orderByRaw('COALESCE(`sort`, id) ASC')
+            ->get();
 
-        //  fetch នាយកដ្ឋាន children of selected អគ្គនាយកដ្ឋាន
         $childDepartments = [];
         if ($request->filled('department_id')) {
-            $childDepartments = Departments::where('parent_id', $request->input('department_id'))
-                ->orderBy('sort')->get();
+            $childDepartments = Department::where('parent_id', $request->input('department_id'))
+                ->orderBy('sort')
+                ->get();
         }
 
-        // Debug endpoint: return the computed departments list
         if ($request->boolean('departments_debug')) {
             return response()->json([
-                'subDepartments'   => $departments->map(fn($d) => [
+                'subDepartments' => $departments->map(fn ($d) => [
                     'id' => $d->id,
                     'name_kh' => $d->name_kh,
                     'parent_id' => $d->parent_id,
                     'sort' => $d->sort,
                 ]),
-                'childDepartments' => $childDepartments->map(fn($d) => [
+                'childDepartments' => $childDepartments->map(fn ($d) => [
                     'id' => $d->id,
                     'name_kh' => $d->name_kh,
                     'parent_id' => $d->parent_id,
@@ -74,27 +71,26 @@ class CivilServantPhotoController extends Controller
             ]);
         }
 
-        // Pre-load all child departments grouped by parent_id for client-side cascade
-        $allChildDepts = Departments::whereIn('parent_id', $departments->pluck('id'))
+        $allChildDepts = Department::whereIn('parent_id', $departments->pluck('id'))
             ->orderBy('sort')
             ->get()
             ->groupBy('parent_id');
 
         return view('civil-servants.index', [
-            'civilServants'    => $query->paginate(20)->withQueryString(),
-            'subDepartments'   => $departments,
+            'civilServants' => $query->paginate(20)->withQueryString(),
+            'subDepartments' => $departments,
             'childDepartments' => $childDepartments,
-            'allChildDepts'    => $allChildDepts,
-            'positions'        => $this->getFilteredPositions($request),
-            'filters'          => $filters,
-            'photoBaseUrl'     => $this->photoBaseUrl(),
+            'allChildDepts' => $allChildDepts,
+            'positions' => $this->getFilteredPositions($request),
+            'filters' => $filters,
+            'photoBaseUrl' => $this->photoBaseUrl(),
         ]);
     }
 
     /**
      * Alias kept for the named route `civil-servants.search`.
      */
-    public function search(Request $request)
+    public function search(Request $request): \Illuminate\View\View|JsonResponse
     {
         return $this->index($request);
     }
@@ -104,12 +100,11 @@ class CivilServantPhotoController extends Controller
      */
     public function ajaxSearch(Request $request): JsonResponse
     {
-        // Quick debug: echo the incoming request when `echo=1` is provided
         if ($request->boolean('echo')) {
             return response()->json(['input' => $request->all()]);
         }
 
-        $query = Civil_servants_Photo::with(['department', 'position', 'images']);
+        $query = CivilServant::with(['department', 'position', 'images']);
         $this->applyFilters($query, $request);
         $this->applySorting($query, $request);
 
@@ -125,24 +120,21 @@ class CivilServantPhotoController extends Controller
      */
     public function showPhoto(string $civilServantId): Response|RedirectResponse|StreamedResponse|BinaryFileResponse
     {
-        $civilServant = Civil_servants_Photo::with(['images', 'position'])->findOrFail($civilServantId);
+        $civilServant = CivilServant::with(['images', 'position'])->findOrFail($civilServantId);
         $image = $civilServant->images->first();
 
         abort_unless($image, 404);
 
-        // Remote redirect
         $photoBaseUrl = $this->photoBaseUrl();
         if ($photoBaseUrl) {
             return redirect($photoBaseUrl . '/' . rawurlencode($image->name));
         }
 
-        // Local storage
         $localPath = $this->resolveLocalPath($civilServant, $image);
         if ($localPath) {
             return response()->file($localPath);
         }
 
-        // HRMIS fallback
         $body = $this->fetchRemotePhoto($civilServantId);
         if ($body) {
             return response($body['content'], 200)
@@ -175,26 +167,23 @@ class CivilServantPhotoController extends Controller
      */
     public function downloadPhoto(string $civilServantId): BinaryFileResponse
     {
-        $civilServant = Civil_servants_Photo::with(['images', 'position'])->findOrFail($civilServantId);
+        $civilServant = CivilServant::with(['images', 'position'])->findOrFail($civilServantId);
         $image = $civilServant->images->first();
 
         abort_unless($image, 404, 'Photo not found');
 
         $downloadName = $civilServant->last_name_kh . '_' . $civilServant->first_name_kh . '_' . $image->name;
 
-        // Local storage
         $localPath = $this->resolveLocalPath($civilServant, $image);
         if ($localPath) {
             return response()->download($localPath, $downloadName);
         }
 
-        // HRMIS by ID
         $body = $this->fetchRemotePhoto($civilServantId);
         if ($body) {
             return $this->downloadFromString($body['content'], $downloadName, $body['content_type']);
         }
 
-        // Legacy: PHOTO_BASE_URL by image filename
         $photoBaseUrl = $this->photoBaseUrl();
         if ($photoBaseUrl) {
             $body = $this->fetchUrl($photoBaseUrl . '/' . rawurlencode($image->name));
@@ -211,15 +200,16 @@ class CivilServantPhotoController extends Controller
      */
     public function downloadDepartment(int $departmentId): JsonResponse|BinaryFileResponse|RedirectResponse
     {
-
         @set_time_limit(0);
+        @ini_set('memory_limit', '512M');
 
         $deptIds = $this->departmentWithChildIds($departmentId);
 
-        $civilServants = Civil_servants_Photo::with(['images', 'position'])
+        $civilServants = CivilServant::with(['images', 'position'])
             ->whereIn('department_id', $deptIds)
             ->whereHas('images')
-            ->get();
+            ->get()
+            ->sortBy(fn (CivilServant $cs) => $cs->position->sort ?? PHP_INT_MAX);
 
         if (request()->boolean('debug')) {
             return $this->buildDebugResponse($departmentId, $deptIds, $civilServants);
@@ -229,40 +219,45 @@ class CivilServantPhotoController extends Controller
             return back()->with('error', 'No photos found for this department');
         }
 
-        $dept = Departments::find($departmentId);
-        $deptName = ($dept && !empty($dept->name_kh)) ? $dept->name_kh : 'department_' . $departmentId;
+        $dept = Department::find($departmentId);
+        $deptName = ($dept && ! empty($dept->name_kh)) ? $dept->name_kh : 'department_' . $departmentId;
         $folderPrefix = $deptName . '/';
-
         $safeZipName = preg_replace('/[^\p{L}\p{N}_]+/u', '_', $deptName) . '.zip';
         $zipPath = storage_path('app/temp/' . $safeZipName);
 
-        if (!is_dir(storage_path('app/temp'))) {
+        if (! is_dir(storage_path('app/temp'))) {
             mkdir(storage_path('app/temp'), 0755, true);
         }
 
-        $zip = new ZipArchive();
-        if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-            return back()->with('error', 'Could not create zip');
-        }
+        // Write ZIP to temp file using ZipStream (produces Mac-compatible archives)
+        $outputStream = fopen($zipPath, 'wb');
+        $zip = new ZipStream(
+            outputStream: $outputStream,
+            sendHttpHeaders: false,
+            defaultCompressionMethod: \ZipStream\CompressionMethod::STORE,
+            enableZip64: false,
+            defaultEnableZeroHeader: false,
+        );
 
         $photoBaseUrl = $this->photoBaseUrl();
-        $tempFiles = [];
-        $addedFiles = 0;
+        $number = 1;
 
         foreach ($civilServants as $civilServant) {
             $image = $civilServant->images->first();
-            if (!$image) {
+            if (! $image) {
                 continue;
             }
 
             $baseName = $civilServant->last_name_kh . '_' . $civilServant->first_name_kh;
-            $entryName = $baseName . '_' . $image->name;
+            $numberedPrefix = $number . '_';
+            $entryName = $numberedPrefix . $baseName . '_' . $image->name;
 
             // 1) Local storage
             $localPath = $this->resolveLocalPath($civilServant, $image);
             if ($localPath) {
-                $zip->addFile($localPath, $folderPrefix . $entryName);
-                $addedFiles++;
+                $zip->addFileFromPath(fileName: $folderPrefix . $entryName, path: $localPath);
+                $number++;
+
                 continue;
             }
 
@@ -270,11 +265,10 @@ class CivilServantPhotoController extends Controller
             $body = $this->fetchRemotePhoto($civilServant->id);
             if ($body) {
                 $ext = $this->extensionFromContentType($body['content_type']);
-                $zipEntryName = $baseName . $ext;
-                $tempFile = $this->writeTempFile($body['content']);
-                $zip->addFile($tempFile, $folderPrefix . $zipEntryName);
-                $tempFiles[] = $tempFile;
-                $addedFiles++;
+                $zipEntryName = $numberedPrefix . $baseName . $ext;
+                $zip->addFile(fileName: $folderPrefix . $zipEntryName, data: $body['content']);
+                $number++;
+
                 continue;
             }
 
@@ -282,26 +276,24 @@ class CivilServantPhotoController extends Controller
             if ($photoBaseUrl) {
                 $body = $this->fetchUrl($photoBaseUrl . '/' . rawurlencode($image->name));
                 if ($body) {
-                    $tempFile = $this->writeTempFile($body['content']);
-                    $zip->addFile($tempFile, $folderPrefix . $entryName);
-                    $tempFiles[] = $tempFile;
-                    $addedFiles++;
+                    $zip->addFile(fileName: $folderPrefix . $entryName, data: $body['content']);
+                    $number++;
                 }
             }
         }
 
-        $zip->close();
+        $zip->finish();
+        fclose($outputStream);
 
-        foreach ($tempFiles as $tempFile) {
-            @unlink($tempFile);
-        }
-
-        if ($addedFiles === 0) {
+        if ($number === 1) {
             @unlink($zipPath);
+
             return back()->with('error', 'No photo files found on disk');
         }
 
-        return response()->download($zipPath, $deptName . '.zip')->deleteFileAfterSend(true);
+        return response()->download($zipPath, $deptName . '.zip', [
+            'Content-Type' => 'application/zip',
+        ])->deleteFileAfterSend(true);
     }
 
     /**
@@ -309,30 +301,29 @@ class CivilServantPhotoController extends Controller
      */
     public function departmentPhotoList(int $departmentId): JsonResponse
     {
-
-        $dept = Departments::find($departmentId);
-        $deptName = ($dept && !empty($dept->name_kh)) ? $dept->name_kh : 'department_' . $departmentId;
+        $dept = Department::find($departmentId);
+        $deptName = ($dept && ! empty($dept->name_kh)) ? $dept->name_kh : 'department_' . $departmentId;
 
         $deptIds = $this->departmentWithChildIds($departmentId);
 
-        $civilServants = Civil_servants_Photo::with('images')
+        $civilServants = CivilServant::with('images')
             ->whereIn('department_id', $deptIds)
             ->whereHas('images')
             ->get();
 
-        $items = $civilServants->map(function (Civil_servants_Photo $cs) {
+        $items = $civilServants->map(function (CivilServant $cs) {
             $image = $cs->images->first();
 
             return $image ? [
-                'id'          => $cs->id,
-                'name'        => $cs->last_name_kh . ' ' . $cs->first_name_kh,
+                'id' => $cs->id,
+                'name' => $cs->last_name_kh . ' ' . $cs->first_name_kh,
                 'downloadUrl' => '/civil-servants/download-photo/' . $cs->id,
             ] : null;
         })->filter()->values();
 
         return response()->json([
             'folderName' => $deptName,
-            'items'      => $items,
+            'items' => $items,
         ]);
     }
 
@@ -368,24 +359,22 @@ class CivilServantPhotoController extends Controller
         $sortBy = $request->input('sort_by', 'position_id');
         $sortDir = $request->input('sort_dir', 'asc') === 'desc' ? 'desc' : 'asc';
 
-        if (!in_array($sortBy, self::ALLOWED_SORTS, true)) {
+        if (! in_array($sortBy, self::ALLOWED_SORTS, true)) {
             $sortBy = 'position_id';
         }
 
         if ($sortBy === 'position_id') {
-            // Use subquery to avoid id column collision with JOIN + eager loading
             $query->orderBy(
-                Positions::select('sort')->whereColumn('positions.id', 'civil_servants.position_id')->limit(1),
+                Position::select('sort')->whereColumn('positions.id', 'civil_servants.position_id')->limit(1),
                 $sortDir
             );
         } elseif ($sortBy === 'department_id') {
-            // Ensure department group id=1 first, group id=2 last via subqueries
             $query->orderByRaw(
                 'CASE WHEN (SELECT parent_id FROM departments WHERE id = civil_servants.department_id) IN (0,1) OR civil_servants.department_id = 1 THEN 0
                       WHEN (SELECT parent_id FROM departments WHERE id = civil_servants.department_id) = 2 OR civil_servants.department_id = 2 THEN 2
                       ELSE 1 END ASC'
             )->orderBy(
-                Departments::select('sort')->whereColumn('departments.id', 'civil_servants.department_id')->limit(1),
+                Department::select('sort')->whereColumn('departments.id', 'civil_servants.department_id')->limit(1),
                 $sortDir
             );
         } else {
@@ -398,10 +387,11 @@ class CivilServantPhotoController extends Controller
         $ids = collect([(int) $departmentId]);
         $parentIds = $ids;
 
-        // Walk down the tree (children, grandchildren, etc.)
         for ($i = 0; $i < 5; $i++) {
-            $childIds = Departments::whereIn('parent_id', $parentIds)->pluck('id');
-            if ($childIds->isEmpty()) break;
+            $childIds = Department::whereIn('parent_id', $parentIds)->pluck('id');
+            if ($childIds->isEmpty()) {
+                break;
+            }
             $ids = $ids->merge($childIds);
             $parentIds = $childIds;
         }
@@ -409,9 +399,9 @@ class CivilServantPhotoController extends Controller
         return $ids->unique()->toArray();
     }
 
-    private function getFilteredPositions(Request $request)
+    private function getFilteredPositions(Request $request): \Illuminate\Database\Eloquent\Collection
     {
-        $posQuery = Positions::where('active', 1)->whereHas('civilServants', function ($q) {
+        $posQuery = Position::where('active', 1)->whereHas('civilServants', function ($q) {
             $q->where('status_type_id', 1);
         });
 
@@ -430,7 +420,10 @@ class CivilServantPhotoController extends Controller
         return $posQuery->orderBy('sort')->get();
     }
 
-    
+    // ──────────────────────────────────────────────
+    //  Private – photo resolution
+    // ──────────────────────────────────────────────
+
     private function photoBaseUrl(): string
     {
         return rtrim(config('services.hrmis.photo_base_url', ''), '/');
@@ -441,14 +434,15 @@ class CivilServantPhotoController extends Controller
         return rtrim(config('services.hrmis.photo_api_base', ''), '/');
     }
 
- 
-    private function localPhotoPaths(Civil_servants_Photo $civilServant, $image): array
+    private function localPhotoPaths(CivilServant $civilServant, $image): array
     {
         $paths = [];
         $positionName = $civilServant->position->name_kh ?? null;
 
         if ($positionName) {
-            $paths[] = 'photos/' . $positionName . '/' . $image->name;
+            // Strip invisible Unicode whitespace (zero-width spaces, etc.) that Flysystem rejects
+            $cleanName = preg_replace('/[\x{200B}\x{200C}\x{200D}\x{FEFF}\x{00AD}]+/u', '', $positionName);
+            $paths[] = 'photos/' . $cleanName . '/' . $image->name;
         }
         $paths[] = 'photos/' . $image->name;
         $paths[] = $image->name;
@@ -456,12 +450,15 @@ class CivilServantPhotoController extends Controller
         return $paths;
     }
 
-
-    private function resolveLocalPath(Civil_servants_Photo $civilServant, $image): ?string
+    private function resolveLocalPath(CivilServant $civilServant, $image): ?string
     {
         foreach ($this->localPhotoPaths($civilServant, $image) as $path) {
-            if (Storage::disk('public')->exists($path)) {
-                return Storage::disk('public')->path($path);
+            try {
+                if (Storage::disk('public')->exists($path)) {
+                    return Storage::disk('public')->path($path);
+                }
+            } catch (\Exception) {
+                continue;
             }
         }
 
@@ -476,7 +473,7 @@ class CivilServantPhotoController extends Controller
     private function fetchRemotePhoto(string|int $civilServantId): ?array
     {
         $base = $this->hrmisApiBase();
-        if (!$base) {
+        if (! $base) {
             return null;
         }
 
@@ -486,12 +483,12 @@ class CivilServantPhotoController extends Controller
             return null;
         }
 
-        if (!$response->successful() || $response->body() === '') {
+        if (! $response->successful() || $response->body() === '') {
             return null;
         }
 
         return [
-            'content'      => $response->body(),
+            'content' => $response->body(),
             'content_type' => $response->header('Content-Type', 'image/jpeg'),
         ];
     }
@@ -509,12 +506,12 @@ class CivilServantPhotoController extends Controller
             return null;
         }
 
-        if (!$response->successful() || $response->body() === '') {
+        if (! $response->successful() || $response->body() === '') {
             return null;
         }
 
         return [
-            'content'      => $response->body(),
+            'content' => $response->body(),
             'content_type' => $response->header('Content-Type', 'image/jpeg'),
         ];
     }
@@ -544,10 +541,10 @@ class CivilServantPhotoController extends Controller
     private function extensionFromContentType(string $contentType): string
     {
         return match (true) {
-            str_contains($contentType, 'png')  => '.png',
-            str_contains($contentType, 'gif')  => '.gif',
+            str_contains($contentType, 'png') => '.png',
+            str_contains($contentType, 'gif') => '.gif',
             str_contains($contentType, 'webp') => '.webp',
-            default                             => '.jpg',
+            default => '.jpg',
         };
     }
 
@@ -557,10 +554,10 @@ class CivilServantPhotoController extends Controller
         $hrmisBase = $this->hrmisApiBase();
 
         $debug = [
-            'departmentId'      => $departmentId,
-            'deptIds'           => $deptIds,
+            'departmentId' => $departmentId,
+            'deptIds' => $deptIds,
             'countCivilServants' => $civilServants->count(),
-            'items'             => [],
+            'items' => [],
         ];
 
         foreach ($civilServants->take(3) as $cs) {
@@ -575,15 +572,15 @@ class CivilServantPhotoController extends Controller
                 $remoteOk = $remoteUrl ? ($this->fetchUrl($remoteUrl) !== null) : null;
 
                 $debug['items'][] = [
-                    'civilServantId'  => $cs->id,
-                    'name'            => $cs->last_name_kh . ' ' . $cs->first_name_kh,
-                    'image'           => $img->name,
-                    'localExists'     => $localExists,
-                    'hrmisUrl'        => $hrmisUrl,
+                    'civilServantId' => $cs->id,
+                    'name' => $cs->last_name_kh . ' ' . $cs->first_name_kh,
+                    'image' => $img->name,
+                    'localExists' => $localExists,
+                    'hrmisUrl' => $hrmisUrl,
                     'hrmisAccessible' => $hrmisOk,
-                    'remoteUrl'       => $remoteUrl,
+                    'remoteUrl' => $remoteUrl,
                     'remoteAccessible' => $remoteOk,
-                    'paths'           => $paths,
+                    'paths' => $paths,
                 ];
             }
         }

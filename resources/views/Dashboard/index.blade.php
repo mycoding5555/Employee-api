@@ -70,31 +70,7 @@
         </div>
     </div>
 
-    {{-- Recent Employees --}}
-    <div class="card-min">
-        <div class="d-flex align-items-center justify-content-between mb-2">
-            <span class="card-min__title mb-0">បុគ្គលិកថ្មីៗ</span>
-            <a href="{{ route('civil-servants.index') }}" class="card-min__link">មើលទាំងអស់ →</a>
-        </div>
-        <div class="recent-list">
-            @forelse($recentEmployees as $emp)
-            <div class="recent-item">
-                <div class="recent-avatar {{ $emp->gender_id == 1 ? 'recent-avatar--m' : 'recent-avatar--f' }}">
-                    {{ mb_substr($emp->last_name_kh ?? '?', 0, 1) }}
-                </div>
-                <div class="recent-info">
-                    <span class="recent-name">{{ $emp->last_name_kh }} {{ $emp->first_name_kh }}</span>
-                    <span class="recent-meta">{{ $emp->position->name_short ?? $emp->position->name_kh ?? '—' }} · {{ $emp->department->name_short ?? $emp->department->abbreviation ?? '—' }}</span>
-                </div>
-                <span class="recent-badge {{ $emp->gender_id == 1 ? 'recent-badge--m' : 'recent-badge--f' }}">
-                    {{ $emp->gender_id == 1 ? 'ប្រុស' : 'ស្រី' }}
-                </span>
-            </div>
-            @empty
-            <p class="text-center text-muted py-3 mb-0">មិនមានទិន្នន័យ</p>
-            @endforelse
-        </div>
-    </div>
+
 
 </div>
 @endsection

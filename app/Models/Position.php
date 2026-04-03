@@ -3,12 +3,14 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Positions extends Model
+class Position extends Model
 {
     public $timestamps = false;
 
     const CREATED_AT = 'created';
+
     const UPDATED_AT = 'modified';
 
     protected $fillable = [
@@ -26,8 +28,8 @@ class Positions extends Model
         'manage',
     ];
 
-    public function civilServants()
+    public function civilServants(): HasMany
     {
-        return $this->hasMany(Civil_servants_Photo::class, 'position_id');
+        return $this->hasMany(CivilServant::class, 'position_id');
     }
 }

@@ -96,7 +96,7 @@
 
                         @php
                             $deptIdForLink = $filters['department_id'] ?? 7;
-                            $deptForLink = \App\Models\Departments::find($deptIdForLink);
+                            $deptForLink = \App\Models\Department::find($deptIdForLink);
                             $deptNameForFname = $deptForLink ? $deptForLink->name_kh : 'department_' . $deptIdForLink;
                         @endphp
                         @if(isset($filters['department_id']) && $filters['department_id'])
