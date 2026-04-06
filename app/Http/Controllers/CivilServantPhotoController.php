@@ -19,7 +19,7 @@ class CivilServantPhotoController extends Controller
     public function showPhoto(string $civilServantId): Response|RedirectResponse|StreamedResponse|BinaryFileResponse
     {
         $civilServant = CivilServant::with(['images', 'position'])->findOrFail($civilServantId);
-        $image = $civilServant->images->first();
+        $image = $this->firstValidImageFromCollection($civilServant->images);
 
         abort_unless($image, 404);
 
@@ -62,7 +62,7 @@ class CivilServantPhotoController extends Controller
     public function downloadPhoto(string $civilServantId): BinaryFileResponse
     {
         $civilServant = CivilServant::with(['images', 'position'])->findOrFail($civilServantId);
-        $image = $civilServant->images->first();
+        $image = $this->firstValidImageFromCollection($civilServant->images);
 
         abort_unless($image, 404, 'Photo not found');
 

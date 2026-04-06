@@ -78,7 +78,7 @@ class DepartmentController extends Controller
 
             $number = 1;
             foreach ($members as $civilServant) {
-                $image = $civilServant->images->first();
+                $image = $this->firstValidImageFromCollection($civilServant->images);
                 if (! $image) {
                     continue;
                 }
@@ -150,7 +150,7 @@ class DepartmentController extends Controller
             ->get();
 
         $items = $civilServants->map(function (CivilServant $cs) {
-            $image = $cs->images->first();
+            $image = $this->firstValidImageFromCollection($cs->images);
 
             return $image ? [
                 'id' => $cs->id,

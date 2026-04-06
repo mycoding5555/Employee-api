@@ -198,24 +198,36 @@
                                         <tr data-download-url="{{ route('civil-servants.download-photo', $emp->id) }}">
                                             <td class="text-muted fw-medium">{{ $civilServants->firstItem() + $i }}</td>
                                             <td>
+                                                @php
+                                                    $avatarColor = $avatarColors[$i % count($avatarColors)];
+                                                    $initial = mb_substr($fullName, 0, 1);
+                                                    $imageName = null;
+                                                @endphp
                                                 @if($emp->images->isNotEmpty())
                                                     @php
-                                                        $avatarColor = $avatarColors[$i % count($avatarColors)];
-                                                        $initial = mb_substr($fullName, 0, 1);
-                                                        $imageName = $emp->images->first()->name;
-                                                        $photoSrc = $photoBaseUrl
-                                                            ? $photoBaseUrl . '/' . $imageName
-                                                            : route('civil-servants.show-photo', $emp->id);
+                                                        $validImage = null;
+                                                        foreach ($emp->images as $im) {
+                                                            if (! empty($im->name) && ! str_starts_with($im->name, '.')) {
+                                                                $validImage = $im;
+                                                                break;
+                                                            }
+                                                        }
+                                                        $imageName = $validImage ? $validImage->name : null;
+                                                        $photoSrc = $imageName
+                                                            ? ($photoBaseUrl ? $photoBaseUrl . '/' . $imageName : route('civil-servants.show-photo', $emp->id))
+                                                            : null;
                                                     @endphp
-                                                    <img src="{{ $photoSrc }}"
-                                                         alt="{{ $fullName }}"
-                                                         class="emp-avatar"
-                                                         style="width:40px;height:40px;border-radius:50%;object-fit:cover;"
-                                                         onerror="this.outerHTML='<span class=\'emp-avatar\' style=\'background:{{ $avatarColor }}\'>{{ $initial }}</span>'">
+                                                    @if($photoSrc)
+                                                        <img src="{{ $photoSrc }}"
+                                                             alt="{{ $fullName }}"
+                                                             class="emp-avatar"
+                                                             style="width:40px;height:40px;border-radius:50%;object-fit:cover;"
+                                                             onerror="this.outerHTML='<span class=\'emp-avatar\' style=\'background:{{ $avatarColor }}\'>{{ $initial }}</span>'">
+                                                    @else
+                                                        <span class="emp-avatar" style="background:{{ $avatarColor }}">{{ $initial }}</span>
+                                                    @endif
                                                 @else
-                                                    <span class="emp-avatar" style="background:{{ $avatarColors[$i % count($avatarColors)] }}">
-                                                        {{ mb_substr($fullName, 0, 1) }}
-                                                    </span>
+                                                    <span class="emp-avatar" style="background:{{ $avatarColor }}">{{ $initial }}</span>
                                                 @endif
                                             </td>
                                             <td>
@@ -227,8 +239,7 @@
                                             <td>{{ $emp->sub_department_name ?? 'N/A' }}</td>
                                             <td>{{ $emp->parent_department_name ?? 'N/A' }}</td>
                                             <td>
-                                                @if($emp->images->isNotEmpty())
-                                                    @php $imageName = $emp->images->first()->name; @endphp
+                                                @if(! empty($imageName))
                                                     <a href="{{ route('civil-servants.download-photo', $emp->id) }}"
                                                        data-fname="{{ $emp->last_name_kh }}_{{ $emp->first_name_kh }}_{{ $imageName }}"
                                                        class="btn btn-sm btn-outline-primary">

@@ -119,6 +119,39 @@ trait PhotoHelper
         return $path;
     }
 
+    protected function isValidImageName(?string $name): bool
+    {
+        if (! $name) {
+            return false;
+        }
+
+        $lower = strtolower($name);
+
+        if (str_starts_with($name, '.')) {
+            return false;
+        }
+
+        if ($lower === '.ds_store') {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Return the first image model from a collection that has a valid (non-dotfile) name.
+     */
+    protected function firstValidImageFromCollection($images)
+    {
+        foreach ($images as $img) {
+            if (! empty($img->name) && $this->isValidImageName($img->name)) {
+                return $img;
+            }
+        }
+
+        return null;
+    }
+
     protected function extensionFromContentType(string $contentType): string
     {
         return match (true) {

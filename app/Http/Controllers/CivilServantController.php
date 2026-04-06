@@ -127,7 +127,14 @@ class CivilServantController extends Controller
         $this->applyFilters($query, $request);
         $this->applySorting($query, $request);
 
-        return response()->json($query->get());
+        $items = $query->get()->map(function ($cs) {
+            $cs->images = $cs->images->filter(function ($img) {
+                return $this->isValidImageName($img->name ?? null);
+            })->values();
+            return $cs;
+        });
+
+        return response()->json($items);
     }
 
     // ──────────────────────────────────────────────
