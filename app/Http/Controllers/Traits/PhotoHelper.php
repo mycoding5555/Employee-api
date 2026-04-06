@@ -135,7 +135,8 @@ trait PhotoHelper
         $parentIds = $ids;
 
         for ($i = 0; $i < 5; $i++) {
-            $childIds = Department::whereIn('parent_id', $parentIds)->pluck('id');
+            // Only include active child departments
+            $childIds = Department::whereIn('parent_id', $parentIds)->where('active', 1)->pluck('id');
             if ($childIds->isEmpty()) {
                 break;
             }

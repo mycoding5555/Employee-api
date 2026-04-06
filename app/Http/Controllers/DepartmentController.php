@@ -145,6 +145,7 @@ class DepartmentController extends Controller
 
         $civilServants = CivilServant::with('images')
             ->whereIn('department_id', $deptIds)
+            ->where('status_type_id', 1)
             ->whereHas('images')
             ->get();
 

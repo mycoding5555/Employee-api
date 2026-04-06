@@ -42,10 +42,10 @@ class CivilServantController extends Controller
         $this->applyFilters($query, $request);
         $this->applySorting($query, $request);
 
-        $baseDepartments = Department::where(function ($q) {
-            $q->whereIn('parent_id', [1, 2])
-              ->orWhereIn('id', [1, 2]);
-        });
+                $baseDepartments = Department::where(function ($q) {
+                        $q->whereIn('parent_id', [1, 2])
+                            ->orWhereIn('id', [1, 2]);
+                })->where('active', 1);
 
         $departments = $baseDepartments
             ->orderByRaw('CASE WHEN id = ? OR parent_id = ? THEN 0 WHEN id = ? OR parent_id = ? THEN 2 ELSE 1 END ASC', [1, 1, 2, 2])
@@ -56,6 +56,7 @@ class CivilServantController extends Controller
         $childDepartments = [];
         if ($request->filled('department_id')) {
             $childDepartments = Department::where('parent_id', $request->input('department_id'))
+                ->where('active', 1)
                 ->orderBy('sort')
                 ->get();
         }
@@ -78,6 +79,7 @@ class CivilServantController extends Controller
         }
 
         $allChildDepts = Department::whereIn('parent_id', $departments->pluck('id'))
+            ->where('active', 1)
             ->orderBy('sort')
             ->get()
             ->groupBy('parent_id');
