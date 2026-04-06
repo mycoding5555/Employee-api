@@ -27,7 +27,18 @@ class CivilServantController extends Controller
     {
         $filters = $request->only(['name_kh', 'department_id', 'parent_id', 'position_id', 'sort_by', 'sort_dir']);
 
-        $query = CivilServant::with(['department', 'position', 'images']);
+        $query = CivilServant::with(['department', 'position', 'images'])
+            ->select('civil_servants.*')
+            ->leftJoin('departments as dept', 'dept.id', '=', 'civil_servants.department_id')
+            ->leftJoin('departments as sub_dept', 'sub_dept.id', '=', 'dept.parent_id')
+            ->leftJoin('departments as parent_dept', 'parent_dept.id', '=', 'sub_dept.parent_id')
+            ->addSelect(
+                'dept.name_kh as department_name',
+                'sub_dept.id as sub_department_id',
+                'sub_dept.name_kh as sub_department_name',
+                'parent_dept.id as parent_department_id',
+                'parent_dept.name_kh as parent_department_name',
+            );
         $this->applyFilters($query, $request);
         $this->applySorting($query, $request);
 
@@ -99,7 +110,18 @@ class CivilServantController extends Controller
             return response()->json(['input' => $request->all()]);
         }
 
-        $query = CivilServant::with(['department', 'position', 'images']);
+        $query = CivilServant::with(['department', 'position', 'images'])
+            ->select('civil_servants.*')
+            ->leftJoin('departments as dept', 'dept.id', '=', 'civil_servants.department_id')
+            ->leftJoin('departments as sub_dept', 'sub_dept.id', '=', 'dept.parent_id')
+            ->leftJoin('departments as parent_dept', 'parent_dept.id', '=', 'sub_dept.parent_id')
+            ->addSelect(
+                'dept.name_kh as department_name',
+                'sub_dept.id as sub_department_id',
+                'sub_dept.name_kh as sub_department_name',
+                'parent_dept.id as parent_department_id',
+                'parent_dept.name_kh as parent_department_name',
+            );
         $this->applyFilters($query, $request);
         $this->applySorting($query, $request);
 

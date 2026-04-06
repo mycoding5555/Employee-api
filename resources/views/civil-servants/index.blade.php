@@ -13,8 +13,13 @@
                         <input type="hidden" name="sort_by" id="sort_by" value="{{ $filters['sort_by'] ?? 'position_id' }}">
                         <input type="hidden" name="sort_dir" id="sort_dir" value="{{ $filters['sort_dir'] ?? 'asc' }}">
                         <div class="mb-2">
-                            <span class="badge bg-primary" style="font-size:0.9rem;">
-                                <i class="bi bi-building me-1"></i> {{ $filters['name_kh'] ?? 'អគ្គនាយកដ្ឋានទាំងអស់' }}
+                            <span class="badge bg-primary" id="dept-badge" style="font-size:0.9rem;">
+                                <i class="bi bi-building me-1"></i>
+                                @if(isset($filters['department_id']) && $filters['department_id'])
+                                    {{ $subDepartments->firstWhere('id', $filters['department_id'])?->name_kh ?? 'អគ្គនាយកដ្ឋានទាំងអស់' }}
+                                @else
+                                    អង្គភាព/អគ្គនាយកដ្ឋានទាំងអស់
+                                @endif
                             </span>
                         </div>
                         <div class="row g-3 align-items-end">
@@ -32,7 +37,7 @@
                             </div>
 
                             <div class="col-md-3">
-                                <label for="department_id" class="form-label-custom">អគ្គនាយកដ្ឋាន</label>
+                                <label for="department_id" class="form-label-custom">អង្គភាព/អគ្គនាយកដ្ឋាន</label>
                                 <select class="form-select" id="department_id" name="department_id">
                                     <option value="">អគ្គនាយកដ្ឋានទាំងអស់</option>
                                     @foreach($subDepartments as $sub)
@@ -45,7 +50,7 @@
                             </div>
 
                             <div class="col-md-3">
-                                <label for="parent_id" class="form-label-custom">នាយកដ្ឋាន</label>
+                                <label for="parent_id" class="form-label-custom">អង្គភាព/នាយកដ្ឋាន</label>
                                 <select class="form-select" id="parent_id" name="parent_id">
                                     <option value="">នាយកដ្ឋានទាំងអស់</option>
                                     @if(isset($childDepartments))
@@ -59,7 +64,7 @@
                                 </select>
                             </div>
                             <div class="col-md-3">
-                                <label for="position_id" class="form-label-custom">មុខតំណែង</label>
+                                <label for="position_id" class="form-label-custom">តួនាទីមុខតំណែង</label>
                                 <select class="form-select" id="position_id" name="position_id">
                                     <option value="">មុខតំណែងទាំងអស់</option>
                                     @foreach($positions as $pos)
@@ -142,7 +147,7 @@
                                             @endif
                                         </th>
                                         <th class="sortable-th" data-sort="position_id">
-                                            មុខតំណែង
+                                            តួនាទី/មុខតំណែង
                                             @if($currentSortBy === 'position_id')
                                                 <i class="bi bi-chevron-{{ $currentSortDir === 'asc' ? 'up' : 'down' }}"></i>
                                             @else
@@ -150,13 +155,15 @@
                                             @endif
                                         </th>
                                         <th class="sortable-th" data-sort="department_id">
-                                            អង្គភាព
+                                            អង្គភាព/អគ្គនាយកដ្ឋាន
                                             @if($currentSortBy === 'department_id')
                                                 <i class="bi bi-chevron-{{ $currentSortDir === 'asc' ? 'up' : 'down' }}"></i>
                                             @else
                                                 <i class="bi bi-chevron-expand text-muted"></i>
                                             @endif
                                         </th>
+                                        <th>អង្គភាព/អគ្គនាយកដ្ឋាន</th>
+                                        <th>អង្គភាព/នាយកដ្ឋាន</th>
                                         <th style="width:160px">ទាញយករូបថត</th>
                                     </tr>
                                 </thead>
@@ -174,7 +181,7 @@
                                         @endphp
                                         @if($currentSortBy === 'position_id' && $positionName !== $lastPositionName)
                                             <tr class="position-group-row">
-                                                <td colspan="7">
+                                                <td colspan="9">
                                                     <strong><i class="bi bi-bookmark-fill me-1"></i>{{ $positionName }}</strong>
                                                 </td>
                                             </tr>
@@ -182,7 +189,7 @@
                                         @endif
                                         @if($currentSortBy === 'department_id' && $nayokName !== $lastDepartmentName)
                                             <tr class="position-group-row">
-                                                <td colspan="7">
+                                                <td colspan="9">
                                                     <strong><i class="bi bi-building me-1"></i>{{ $nayokName }}</strong>
                                                 </td>
                                             </tr>
@@ -216,7 +223,9 @@
                                             </td>
                                             <td>{{ $emp['gender_id'] == 1 ? 'ប្រុស' : 'ស្រី' }}</td>
                                             <td>{{ $emp['position']['name_kh'] ?? $emp['position']['name_short'] ?? $emp['position']['abb'] ?? 'N/A' }}</td>
-                                            <td>{{ $emp['department']['name_kh'] ?? 'N/A' }}</td>
+                                            <td>{{ $emp->department_name ?? $emp['department']['name_kh'] ?? 'N/A' }}</td>
+                                            <td>{{ $emp->sub_department_name ?? 'N/A' }}</td>
+                                            <td>{{ $emp->parent_department_name ?? 'N/A' }}</td>
                                             <td>
                                                 @if($emp->images->isNotEmpty())
                                                     @php $imageName = $emp->images->first()->name; @endphp
@@ -277,6 +286,7 @@
         const sortDirInput = document.getElementById('sort_dir');
         const resultsContainer = document.getElementById('results-container');
         const searchForm = document.getElementById('search-form');
+        const deptBadge = document.getElementById('dept-badge');
         const avatarColors = ['#4f46e5','#7c3aed','#2563eb','#0891b2','#059669','#d97706','#dc2626','#db2777'];
         const perPage = 20;
         const photoBaseUrl = '{{ $photoBaseUrl ?? '' }}';
@@ -293,6 +303,8 @@
         // Cascade: when អគ្គនាយកដ្ឋាន changes, fetch children for នាយកដ្ឋាន
         generalDeptSelect.addEventListener('change', function() {
             const parentId = this.value;
+            const selectedText = this.options[this.selectedIndex]?.text?.trim() || 'អគ្គនាយកដ្ឋានទាំងអស់';
+            deptBadge.innerHTML = '<i class="bi bi-building me-1"></i> ' + (parentId ? selectedText : 'អគ្គនាយកដ្ឋានទាំងអស់');
             deptSelect.innerHTML = '<option value="">នាយកដ្ឋានទាំងអស់</option>';
             deptSelect.disabled = true;
             // Reset position dropdown when general department changes
@@ -574,7 +586,7 @@
 
             let rows = '';
             let lastPositionName = null;
-            pageItems.forEach(function(emp, i) {
+                pageItems.forEach(function(emp, i) {
                 const globalIndex = start + i + 1;
                 const color = avatarColors[(start + i) % avatarColors.length];
                 const initial = emp.last_name_kh ? escapeHtml(emp.last_name_kh.charAt(0)) : '?';
@@ -586,7 +598,7 @@
                 // Position group header row
                 if (currentSortBy === 'position_id' && title !== lastPositionName) {
                     rows += `<tr class="position-group-row">
-                        <td colspan="7"><strong><i class="bi bi-bookmark-fill me-1"></i>${title}</strong></td>
+                        <td colspan="9"><strong><i class="bi bi-bookmark-fill me-1"></i>${title}</strong></td>
                     </tr>`;
                     lastPositionName = title;
                 }
@@ -594,7 +606,7 @@
                 // Department group header row
                 if (currentSortBy === 'department_id' && deptName !== lastPositionName) {
                     rows += `<tr class="position-group-row">
-                        <td colspan="7"><strong><i class="bi bi-building me-1"></i>${deptName}</strong></td>
+                        <td colspan="9"><strong><i class="bi bi-building me-1"></i>${deptName}</strong></td>
                     </tr>`;
                     lastPositionName = deptName;
                 }
@@ -613,6 +625,9 @@
                     ? `<img src="${photoSrc}" alt="${name}" class="emp-avatar" style="width:40px;height:40px;border-radius:50%;object-fit:cover;" onerror="this.outerHTML=this.dataset.fallback" data-fallback="${fallbackAvatar.replace(/"/g, '&quot;')}">`
                     : fallbackAvatar;
 
+                const subDeptName = emp.sub_department_name ? escapeHtml(emp.sub_department_name) : (emp.sub_department ? escapeHtml(emp.sub_department.name_kh || '') : 'N/A');
+                const parentDeptName = emp.parent_department_name ? escapeHtml(emp.parent_department_name) : (emp.parent_department ? escapeHtml(emp.parent_department.name_kh || '') : 'N/A');
+
                 rows += `<tr data-download-url="/civil-servants/download-photo/${encodeURIComponent(emp.id)}">
                     <td class="text-muted fw-medium">${globalIndex}</td>
                     <td>${avatarHtml}</td>
@@ -620,6 +635,8 @@
                     <td>${sex}</td>
                     <td>${title}</td>
                     <td>${deptName}</td>
+                    <td>${subDeptName}</td>
+                    <td>${parentDeptName}</td>
                     <td>${photoCell}</td>
                 </tr>`;
             });
@@ -665,8 +682,10 @@
                                 <th>រូបថត</th>
                                 <th class="sortable-th-js" data-sort="last_name_kh">គោត្តនាម និងនាម ${sortIcon('last_name_kh')}</th>
                                 <th class="sortable-th-js" data-sort="gender_id">ភេទ ${sortIcon('gender_id')}</th>
-                                <th class="sortable-th-js" data-sort="position_id">មុខតំណែង ${sortIcon('position_id')}</th>
-                                <th class="sortable-th-js" data-sort="department_id">នាយកដ្ឋាន ${sortIcon('department_id')}</th>
+                                <th class="sortable-th-js" data-sort="position_id">តួនាទី/មុខតំណែង ${sortIcon('position_id')}</th>
+                                <th class="sortable-th-js" data-sort="department_id">អង្គភាព/អគ្គនាយកដ្ឋាន ${sortIcon('department_id')}</th>
+                                <th>អង្គភាព/អគ្គនាយកដ្ឋាន</th>
+                                <th>អង្គភាព/នាយកដ្ឋាន</th>
                                 <th style="width:160px">ទាញយករូបថត</th>
                             </tr></thead>
                             <tbody>${rows}</tbody>
