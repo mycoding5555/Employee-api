@@ -128,7 +128,7 @@
                             <table class="table-custom table">
                                 <thead>
                                     <tr>
-                                        <th style="width:60px">អត្តលេខ</th>
+                                        <th style="width:60px">លេខរៀង</th>
                                         <th>រូបថត</th>
                                         <th class="sortable-th" data-sort="last_name_kh">
                                             គោត្តនាម និងនាម
