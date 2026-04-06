@@ -220,8 +220,7 @@
                                                     @if($photoSrc)
                                                         <img src="{{ $photoSrc }}"
                                                              alt="{{ $fullName }}"
-                                                             class="emp-avatar"
-                                                             style="width:40px;height:40px;border-radius:50%;object-fit:cover;"
+                                                             class="emp-avatar emp-avatar-img"
                                                              onerror="this.outerHTML='<span class=\'emp-avatar\' style=\'background:{{ $avatarColor }}\'>{{ $initial }}</span>'">
                                                     @else
                                                         <span class="emp-avatar" style="background:{{ $avatarColor }}">{{ $initial }}</span>
