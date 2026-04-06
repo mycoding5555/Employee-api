@@ -42,16 +42,14 @@ class CivilServantController extends Controller
         $this->applyFilters($query, $request);
         $this->applySorting($query, $request);
 
-                $baseDepartments = Department::where(function ($q) {
-                        $q->whereIn('parent_id', [1, 2])
-                            ->orWhereIn('id', [1, 2]);
-                })->where('active', 1);
-
-        $departments = $baseDepartments
-            ->orderByRaw('CASE WHEN id = ? OR parent_id = ? THEN 0 WHEN id = ? OR parent_id = ? THEN 2 ELSE 1 END ASC', [1, 1, 2, 2])
-            ->orderByRaw('CASE WHEN id IN (?, ?) THEN 0 ELSE 1 END ASC', [1, 2])
-            ->orderByRaw('COALESCE(`sort`, id) ASC')
-            ->get();
+        $departments = Department::where(function ($q) {
+                $q->whereIn('parent_id', [1, 2])
+                    ->orWhereIn('id', [1, 2]);
+            })->where('active', 1)
+                ->orderByRaw('CASE WHEN id = ? OR parent_id = ? THEN 0 WHEN id = ? OR parent_id = ? THEN 2 ELSE 1 END ASC', [1, 1, 2, 2])
+                ->orderByRaw('CASE WHEN id IN (?, ?) THEN 0 ELSE 1 END ASC', [1, 2])
+                ->orderByRaw('COALESCE(`sort`, id) ASC')
+                ->get();
 
         $childDepartments = [];
         if ($request->filled('department_id')) {
@@ -104,7 +102,7 @@ class CivilServantController extends Controller
     }
 
     /**
-     * AJAX search – returns full JSON collection (client-side pagination).
+     * AJAX search – returns server-side paginated JSON.
      */
     public function ajaxSearch(Request $request): JsonResponse
     {
@@ -127,14 +125,17 @@ class CivilServantController extends Controller
         $this->applyFilters($query, $request);
         $this->applySorting($query, $request);
 
-        $items = $query->get()->map(function ($cs) {
+        $perPage = min((int) $request->input('per_page', 20), 100);
+        $paginated = $query->paginate($perPage)->withQueryString();
+
+        $paginated->getCollection()->transform(function ($cs) {
             $cs->images = $cs->images->filter(function ($img) {
                 return $this->isValidImageName($img->name ?? null);
             })->values();
             return $cs;
         });
 
-        return response()->json($items);
+        return response()->json($paginated);
     }
 
     // ──────────────────────────────────────────────

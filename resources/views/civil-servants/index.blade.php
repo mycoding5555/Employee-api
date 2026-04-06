@@ -221,6 +221,7 @@
                                                         <img src="{{ $photoSrc }}"
                                                              alt="{{ $fullName }}"
                                                              class="emp-avatar emp-avatar-img"
+                                                             loading="lazy"
                                                              onerror="this.outerHTML='<span class=\'emp-avatar\' style=\'background:{{ $avatarColor }}\'>{{ $initial }}</span>'">
                                                     @else
                                                         <span class="emp-avatar" style="background:{{ $avatarColor }}">{{ $initial }}</span>
@@ -302,7 +303,7 @@
         const photoBaseUrl = '{{ $photoBaseUrl ?? '' }}';
         const deptChildrenMap = @json($allChildDepts);
         let debounceTimer;
-        let allCivilServants = [];
+        let lastResponse = null;
         let currentPage = 1;
         let currentDeptId = '';
         let currentDeptName = '';
@@ -391,20 +392,22 @@
             if (currentPosId) params.append('position_id', currentPosId);
             params.append('sort_by', currentSortBy);
             params.append('sort_dir', currentSortDir);
+            params.append('page', currentPage);
+            params.append('per_page', perPage);
 
             fetch('{{ route("civil-servants.ajax-search") }}?' + params.toString())
                 .then(function(r) {
                     if (!r.ok) throw new Error('HTTP ' + r.status);
                     return r.json();
                 })
-                .then(function(civilServants) {
-                    allCivilServants = Array.isArray(civilServants) ? civilServants : [];
+                .then(function(response) {
+                    lastResponse = response;
 
                     // Rebuild position dropdown from fetched civil servants
                     if (rebuildPositions) {
                         const seen = {};
                         const positions = [];
-                        allCivilServants.forEach(function(emp) {
+                        (response.data || []).forEach(function(emp) {
                             if (emp.position && !seen[emp.position.id]) {
                                 seen[emp.position.id] = true;
                                 positions.push(emp.position);
@@ -561,11 +564,12 @@
         }
 
         function renderPage() {
-            const total = allCivilServants.length;
-            const totalPages = Math.ceil(total / perPage);
-            if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
-            const start = (currentPage - 1) * perPage;
-            const pageItems = allCivilServants.slice(start, start + perPage);
+            if (!lastResponse) return;
+            const pageItems = lastResponse.data || [];
+            const total = lastResponse.total || 0;
+            const totalPages = lastResponse.last_page || 1;
+            currentPage = lastResponse.current_page || 1;
+            const startIndex = lastResponse.from || 1;
 
             if (total === 0) {
                 resultsContainer.innerHTML = `
@@ -597,8 +601,8 @@
             let rows = '';
             let lastPositionName = null;
                 pageItems.forEach(function(emp, i) {
-                const globalIndex = start + i + 1;
-                const color = avatarColors[(start + i) % avatarColors.length];
+                const globalIndex = (startIndex || 1) + i;
+                const color = avatarColors[i % avatarColors.length];
                 const initial = emp.last_name_kh ? escapeHtml(emp.last_name_kh.charAt(0)) : '?';
                 const name = escapeHtml((emp.last_name_kh || '') + ' ' + (emp.first_name_kh || '')).trim();
                 const sex = emp.gender_id == 1 ? '\u1794\u17d2\u179a\u17bb\u179f' : '\u179f\u17d2\u179a\u17b8';
@@ -632,7 +636,7 @@
 
                 const fallbackAvatar = `<span class="emp-avatar" style="background:${color}">${initial}</span>`;
                 const avatarHtml = hasPhoto
-                    ? `<img src="${photoSrc}" alt="${name}" class="emp-avatar" style="width:40px;height:40px;border-radius:50%;object-fit:cover;" onerror="this.outerHTML=this.dataset.fallback" data-fallback="${fallbackAvatar.replace(/"/g, '&quot;')}">`
+                    ? `<img src="${photoSrc}" alt="${name}" class="emp-avatar" style="width:40px;height:40px;border-radius:50%;object-fit:cover;" loading="lazy" onerror="this.outerHTML=this.dataset.fallback" data-fallback="${fallbackAvatar.replace(/"/g, '&quot;')}">`
                     : fallbackAvatar;
 
                 const subDeptName = emp.sub_department_name ? escapeHtml(emp.sub_department_name) : (emp.sub_department ? escapeHtml(emp.sub_department.name_kh || '') : 'N/A');
@@ -728,7 +732,7 @@
                     const page = parseInt(this.getAttribute('data-page'));
                     if (page >= 1 && page <= totalPages) {
                         currentPage = page;
-                        renderPage();
+                        fetchCivilServants();
                         resultsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     }
                 });
