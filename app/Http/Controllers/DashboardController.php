@@ -4,58 +4,41 @@ namespace App\Http\Controllers;
 
 use App\Models\CivilServant;
 use App\Models\Department;
-use App\Models\Position;
 
 class DashboardController extends Controller
 {
     public function index(): \Illuminate\View\View
     {
-        $totalStaff = CivilServant::count();
-        $totalDepartments = Department::where('id', 7)->orWhere('parent_id', 7)->count();
-        $totalPositions = Position::whereHas('civilServants')->count();
-
-        $maleCount = CivilServant::where('gender_id', 1)->count();
-        $femaleCount = CivilServant::where('gender_id', 2)->count();
-
-        $topDepartments = Department::where('id', 7)->orWhere('parent_id', 7)
-            ->withCount('civilServants')
-            ->orderByDesc('civil_servants_count')
-            ->limit(8)
+        $totalCivilServant = CivilServant::where('status_type_id', 1)->count();
+        $maleCount = CivilServant::where('status_type_id', 1)->where('gender_id', 1)->count();
+        $femaleCount = CivilServant::where('status_type_id', 1)->where('gender_id', 2)->count();
+        // Photo counts: those who have at least one image vs those who don't
+        $hasPhotoCount = CivilServant::where('status_type_id', 1)->whereHas('images')->count();
+        $noPhotoCount = $totalCivilServant - $hasPhotoCount;
+        // អគ្គនាយកដ្ឋាន (parent_id = 1), ordered by sort
+        $departments = Department::where('active', 1)
+            ->where('parent_id', 1)
+            ->orderBy('sort')
             ->get();
+        $totalDepartments = $departments->count();
 
-        $topPositions = Position::withCount('civilServants')
-            ->having('civil_servants_count', '>', 0)
-            ->orderByDesc('civil_servants_count')
-            ->limit(6)
+      // ថ្នាក់នាយកដ្ឋាន
+        $childDepartments = Department::where('active', 1)
+            ->where('parent_id', '!=', 1)
+            ->orderBy('sort')
             ->get();
+        $totalChildDepartments = $childDepartments->count();
 
-        $recentEmployees = CivilServant::with(['department', 'position'])
-            ->orderByDesc('created_at')
-            ->limit(5)
-            ->get();
-
-        $withPhoto = CivilServant::whereHas('images')->count();
-        $withoutPhoto = $totalStaff - $withPhoto;
-
-        $chartData = [
-            'deptLabels' => $topDepartments->map(fn ($d) => $d->name_short ?? $d->abbreviation ?? $d->name_kh)->values(),
-            'deptValues' => $topDepartments->pluck('civil_servants_count')->values(),
-            'posLabels' => $topPositions->map(fn ($p) => $p->name_short ?? $p->name_kh)->values(),
-            'posValues' => $topPositions->pluck('civil_servants_count')->values(),
-        ];
 
         return view('Dashboard.index', compact(
-            'totalStaff',
+            'totalCivilServant',
             'totalDepartments',
-            'totalPositions',
+            'totalChildDepartments',
             'maleCount',
             'femaleCount',
-            'topDepartments',
-            'topPositions',
-            'recentEmployees',
-            'withPhoto',
-            'withoutPhoto',
-            'chartData',
+            'hasPhotoCount',
+            'noPhotoCount',
+            'departments',
         ));
     }
 }
