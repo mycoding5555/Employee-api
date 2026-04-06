@@ -14,7 +14,6 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use ZipArchive;
 use ZipStream\ZipStream;
 
 class CivilServantPhotoController extends Controller
@@ -30,7 +29,7 @@ class CivilServantPhotoController extends Controller
 
     public function index(Request $request): \Illuminate\View\View|JsonResponse
     {
-        $filters = $request->only(['name_kh', 'department_id', 'position_id', 'sort_by', 'sort_dir']);
+        $filters = $request->only(['name_kh', 'department_id', 'parent_id', 'position_id', 'sort_by', 'sort_dir']);
 
         $query = CivilServant::with(['department', 'position', 'images']);
         $this->applyFilters($query, $request);
@@ -205,8 +204,9 @@ class CivilServantPhotoController extends Controller
 
         $deptIds = $this->departmentWithChildIds($departmentId);
 
-        $civilServants = CivilServant::with(['images', 'position'])
+        $civilServants = CivilServant::with(['images', 'position', 'department'])
             ->whereIn('department_id', $deptIds)
+            ->where('status_type_id', 1)
             ->whereHas('images')
             ->get()
             ->sortBy(fn (CivilServant $cs) => $cs->position->sort ?? PHP_INT_MAX);
@@ -221,7 +221,19 @@ class CivilServantPhotoController extends Controller
 
         $dept = Department::find($departmentId);
         $deptName = ($dept && ! empty($dept->name_kh)) ? $dept->name_kh : 'department_' . $departmentId;
-        $folderPrefix = $deptName . '/';
+
+        // Load all departments in the tree keyed by id
+        $allDepts = Department::whereIn('id', $deptIds)->get()->keyBy('id');
+
+        // Build folder path for each department by walking up to the root
+        $deptFolderPaths = [];
+        foreach ($allDepts as $d) {
+            $deptFolderPaths[$d->id] = $this->buildDeptFolderPath($d, $departmentId, $allDepts);
+        }
+
+        // Group civil servants by their department_id
+        $grouped = $civilServants->groupBy('department_id');
+
         $safeZipName = preg_replace('/[^\p{L}\p{N}_]+/u', '_', $deptName) . '.zip';
         $zipPath = storage_path('app/temp/' . $safeZipName);
 
@@ -229,7 +241,6 @@ class CivilServantPhotoController extends Controller
             mkdir(storage_path('app/temp'), 0755, true);
         }
 
-        // Write ZIP to temp file using ZipStream (produces Mac-compatible archives)
         $outputStream = fopen($zipPath, 'wb');
         $zip = new ZipStream(
             outputStream: $outputStream,
@@ -240,44 +251,50 @@ class CivilServantPhotoController extends Controller
         );
 
         $photoBaseUrl = $this->photoBaseUrl();
-        $number = 1;
+        $totalAdded = 0;
 
-        foreach ($civilServants as $civilServant) {
-            $image = $civilServant->images->first();
-            if (! $image) {
-                continue;
-            }
+        foreach ($grouped as $deptId => $members) {
+            $folderPrefix = ($deptFolderPaths[$deptId] ?? $deptName) . '/';
 
-            $baseName = $civilServant->last_name_kh . '_' . $civilServant->first_name_kh;
-            $numberedPrefix = $number . '_';
-            $entryName = $numberedPrefix . $baseName . '_' . $image->name;
+            $number = 1;
+            foreach ($members as $civilServant) {
+                $image = $civilServant->images->first();
+                if (! $image) {
+                    continue;
+                }
 
-            // 1) Local storage
-            $localPath = $this->resolveLocalPath($civilServant, $image);
-            if ($localPath) {
-                $zip->addFileFromPath(fileName: $folderPrefix . $entryName, path: $localPath);
-                $number++;
+                $baseName = $civilServant->last_name_kh . '_' . $civilServant->first_name_kh;
+                $numberedPrefix = $number . '_';
+                $entryName = $numberedPrefix . $baseName . '_' . $image->name;
 
-                continue;
-            }
-
-            // 2) HRMIS by ID
-            $body = $this->fetchRemotePhoto($civilServant->id);
-            if ($body) {
-                $ext = $this->extensionFromContentType($body['content_type']);
-                $zipEntryName = $numberedPrefix . $baseName . $ext;
-                $zip->addFile(fileName: $folderPrefix . $zipEntryName, data: $body['content']);
-                $number++;
-
-                continue;
-            }
-
-            // 3) PHOTO_BASE_URL by filename
-            if ($photoBaseUrl) {
-                $body = $this->fetchUrl($photoBaseUrl . '/' . rawurlencode($image->name));
-                if ($body) {
-                    $zip->addFile(fileName: $folderPrefix . $entryName, data: $body['content']);
+                // 1) Local storage
+                $localPath = $this->resolveLocalPath($civilServant, $image);
+                if ($localPath) {
+                    $zip->addFileFromPath(fileName: $folderPrefix . $entryName, path: $localPath);
                     $number++;
+                    $totalAdded++;
+                    continue;
+                }
+
+                // 2) HRMIS by ID
+                $body = $this->fetchRemotePhoto($civilServant->id);
+                if ($body) {
+                    $ext = $this->extensionFromContentType($body['content_type']);
+                    $zipEntryName = $numberedPrefix . $baseName . $ext;
+                    $zip->addFile(fileName: $folderPrefix . $zipEntryName, data: $body['content']);
+                    $number++;
+                    $totalAdded++;
+                    continue;
+                }
+
+                // 3) PHOTO_BASE_URL by filename
+                if ($photoBaseUrl) {
+                    $body = $this->fetchUrl($photoBaseUrl . '/' . rawurlencode($image->name));
+                    if ($body) {
+                        $zip->addFile(fileName: $folderPrefix . $entryName, data: $body['content']);
+                        $number++;
+                        $totalAdded++;
+                    }
                 }
             }
         }
@@ -285,7 +302,7 @@ class CivilServantPhotoController extends Controller
         $zip->finish();
         fclose($outputStream);
 
-        if ($number === 1) {
+        if ($totalAdded === 0) {
             @unlink($zipPath);
 
             return back()->with('error', 'No photo files found on disk');
@@ -343,10 +360,10 @@ class CivilServantPhotoController extends Controller
             });
         }
 
-        if ($request->filled('department_id')) {
+        if ($request->filled('parent_id')) {
+            $query->whereIn('civil_servants.department_id', $this->departmentWithChildIds($request->input('parent_id')));
+        } elseif ($request->filled('department_id')) {
             $query->whereIn('civil_servants.department_id', $this->departmentWithChildIds($request->input('department_id')));
-        } elseif ($request->filled('general_department_id')) {
-            $query->whereIn('civil_servants.department_id', $this->departmentWithChildIds($request->input('general_department_id')));
         }
 
         if ($request->filled('position_id')) {
@@ -399,19 +416,39 @@ class CivilServantPhotoController extends Controller
         return $ids->unique()->toArray();
     }
 
+    /**
+     * Build the folder path for a department by walking up to the root department.
+     * e.g. អគ្គនាយកដ្ឋាន/នាយកដ្ឋាន/ការិយាល័យ
+     */
+    private function buildDeptFolderPath(Department $dept, int $rootDeptId, $allDepts): string
+    {
+        $segments = [];
+        $current = $dept;
+
+        while ($current) {
+            $segments[] = $current->name_kh ?: ('dept_' . $current->id);
+            if ($current->id == $rootDeptId) {
+                break;
+            }
+            $current = $allDepts->get($current->parent_id);
+        }
+
+        return implode('/', array_reverse($segments));
+    }
+
     private function getFilteredPositions(Request $request): \Illuminate\Database\Eloquent\Collection
     {
         $posQuery = Position::where('active', 1)->whereHas('civilServants', function ($q) {
             $q->where('status_type_id', 1);
         });
 
-        if ($request->filled('department_id')) {
-            $deptIds = $this->departmentWithChildIds($request->input('department_id'));
+        if ($request->filled('parent_id')) {
+            $deptIds = $this->departmentWithChildIds($request->input('parent_id'));
             $posQuery->whereHas('civilServants', function ($q) use ($deptIds) {
                 $q->where('status_type_id', 1)->whereIn('department_id', $deptIds);
             });
-        } elseif ($request->filled('general_department_id')) {
-            $deptIds = $this->departmentWithChildIds($request->input('general_department_id'));
+        } elseif ($request->filled('department_id')) {
+            $deptIds = $this->departmentWithChildIds($request->input('department_id'));
             $posQuery->whereHas('civilServants', function ($q) use ($deptIds) {
                 $q->where('status_type_id', 1)->whereIn('department_id', $deptIds);
             });

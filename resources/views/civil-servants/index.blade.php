@@ -32,12 +32,12 @@
                             </div>
 
                             <div class="col-md-3">
-                                <label for="general_department_id" class="form-label-custom">អគ្គនាយកដ្ឋាន</label>
-                                <select class="form-select" id="general_department_id" name="general_department_id">
+                                <label for="department_id" class="form-label-custom">អគ្គនាយកដ្ឋាន</label>
+                                <select class="form-select" id="department_id" name="department_id">
                                     <option value="">អគ្គនាយកដ្ឋានទាំងអស់</option>
                                     @foreach($subDepartments as $sub)
                                         <option value="{{ $sub->id }}"
-                                            {{ (isset($filters['general_department_id']) && $filters['general_department_id'] == $sub->id) ? 'selected' : '' }}>
+                                            {{ (isset($filters['department_id']) && $filters['department_id'] == $sub->id) ? 'selected' : '' }}>
                                             {{ $sub->name_kh }}
                                         </option>
                                     @endforeach
@@ -45,13 +45,13 @@
                             </div>
 
                             <div class="col-md-3">
-                                <label for="department_id" class="form-label-custom">នាយកដ្ឋាន</label>
-                                <select class="form-select" id="department_id" name="department_id">
+                                <label for="parent_id" class="form-label-custom">នាយកដ្ឋាន</label>
+                                <select class="form-select" id="parent_id" name="parent_id">
                                     <option value="">នាយកដ្ឋានទាំងអស់</option>
                                     @if(isset($childDepartments))
                                         @foreach($childDepartments as $child)
                                             <option value="{{ $child->id }}"
-                                                {{ (isset($filters['department_id']) && $filters['department_id'] == $child->id) ? 'selected' : '' }}>
+                                                {{ (isset($filters['parent_id']) && $filters['parent_id'] == $child->id) ? 'selected' : '' }}>
                                                 {{ $child->name_kh }}
                                             </option>
                                         @endforeach
@@ -95,19 +95,19 @@
                         </span>
 
                         @php
-                            $deptIdForLink = $filters['department_id'] ?? 7;
-                            $deptForLink = \App\Models\Department::find($deptIdForLink);
-                            $deptNameForFname = $deptForLink ? $deptForLink->name_kh : 'department_' . $deptIdForLink;
+                            $deptIdForLink = $filters['parent_id'] ?? $filters['department_id'] ?? null;
+                            $deptForLink = $deptIdForLink ? \App\Models\Department::find($deptIdForLink) : null;
+                            $deptNameForFname = $deptForLink ? $deptForLink->name_kh : 'department';
                         @endphp
-                        @if(isset($filters['department_id']) && $filters['department_id'])
-                            <a href="{{ route('civil-servants.download-department', $filters['department_id']) }}"
+                        @if($deptIdForLink)
+                            <a href="{{ route('civil-servants.download-department', $deptIdForLink) }}"
                                data-fname="{{ $deptNameForFname }}.zip"
                                class="btn btn-success-custom">
                                 <i class="bi bi-file-earmark-zip me-1"></i> ទាញយករូបថតតាមនាយកដ្ឋាន
                             </a>
                         @else
                             <a href="{{ route('civil-servants.download-department', 7) }}"
-                               data-fname="{{ $deptNameForFname }}.zip"
+                               data-fname="ទាំងអស់.zip"
                                class="btn btn-success-custom">
                                 <i class="bi bi-file-earmark-zip me-1"></i> ទាញយករូបថតទាំងអស់
                             </a>
@@ -270,8 +270,8 @@
     <script>
     (function() {
         const nameInput = document.getElementById('name');
-        const generalDeptSelect = document.getElementById('general_department_id');
-        const deptSelect = document.getElementById('department_id');
+        const generalDeptSelect = document.getElementById('department_id');
+        const deptSelect = document.getElementById('parent_id');
         const posSelect = document.getElementById('position_id');
         const sortByInput = document.getElementById('sort_by');
         const sortDirInput = document.getElementById('sort_dir');
@@ -362,9 +362,9 @@
 
             if (name) params.append('name_kh', name);
             if (currentDeptId) {
-                params.append('department_id', currentDeptId);
+                params.append('parent_id', currentDeptId);
             } else if (generalDeptId) {
-                params.append('general_department_id', generalDeptId);
+                params.append('department_id', generalDeptId);
             }
             if (currentPosId) params.append('position_id', currentPosId);
             params.append('sort_by', currentSortBy);
@@ -561,10 +561,16 @@
             }
 
             let downloadBtn = '';
-            const deptForLink = currentDeptId || '7';
-            const suggestedDeptName = (currentDeptName || 'department_' + deptForLink) + '.zip';
+            const generalDeptId = generalDeptSelect.value;
+            const generalDeptName = generalDeptSelect.options[generalDeptSelect.selectedIndex]?.text?.trim() || '';
+            const deptForLink = currentDeptId || generalDeptId || '7';
+            const deptLabelForLink = currentDeptId ? currentDeptName : generalDeptName;
+            const suggestedDeptName = (deptLabelForLink || 'department_' + deptForLink) + '.zip';
+            const btnLabel = (currentDeptId || generalDeptId)
+                ? 'ទាញយករូបថតតាមនាយកដ្ឋាន'
+                : 'ទាញយករូបថតទាំងអស់';
             downloadBtn = `<a href="/civil-servants/download-department/${encodeURIComponent(deptForLink)}" data-fname="${suggestedDeptName}" class="btn btn-success-custom">
-                    <i class="bi bi-file-earmark-zip me-1"></i> ទាញយករូបថតតាមនាយកដ្ឋាន</a>`;
+                    <i class="bi bi-file-earmark-zip me-1"></i> ${btnLabel}</a>`;
 
             let rows = '';
             let lastPositionName = null;
