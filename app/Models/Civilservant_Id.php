@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Civilservant_Id extends Model
 {
-    protected $table = ['documents','document_deltas'];
+    protected $table = 'documents';
 
     protected $fillable = [
         'code',
@@ -33,7 +34,12 @@ class Civilservant_Id extends Model
     protected static function booted(): void
     {
         static::addGlobalScope('civilservant_id', function (Builder $builder) {
-            $builder->where('document_type_id', 10);
+            $builder->where('documents.document_type_id', 10);
         });
+    }
+
+    public function deltas(): HasMany
+    {
+        return $this->hasMany(DocumentDelta::class, 'document_id');
     }
 }

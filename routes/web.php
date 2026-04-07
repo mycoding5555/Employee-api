@@ -29,7 +29,9 @@ Route::get('/civil-servants/download-photo/{civil_servant_id}', [CivilServantPho
 Route::get('/civil-servants/download-department/{department_id}', [DepartmentController::class, 'downloadDepartment'])->name('civil-servants.download-department');
 Route::get('/civil-servants/department-photo-list/{department_id}', [DepartmentController::class, 'departmentPhotoList'])->name('civil-servants.department-photo-list');
 
-// Civil servant ID documents
+// Civil servant ID documents (អត្តសញ្ញណប័ណ្ណ)
 Route::get('/civilservant-id', [CivilservantIdController::class, 'index'])->name('civilservant-id.index');
+Route::get('/civilservant-id/ajax-search', [CivilservantIdController::class, 'ajaxSearch'])->middleware('throttle:60,1')->name('civilservant-id.ajax-search');
+Route::get('/civilservant-id/download-pdf', [CivilservantIdController::class, 'downloadPdf'])->name('civilservant-id.download-pdf');
 
 // Debugbar registers its own routes via its service provider; no manual include needed.

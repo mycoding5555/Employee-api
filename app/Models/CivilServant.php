@@ -59,4 +59,9 @@ class CivilServant extends Model
     {
         return $this->hasMany(Image::class, 'civil_servant_id');
     }
+
+    public function documentDeltas(): HasMany
+    {
+        return $this->hasMany(DocumentDelta::class, 'civil_servant_id');
+    }
 }
