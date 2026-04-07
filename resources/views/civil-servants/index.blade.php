@@ -233,8 +233,8 @@
                                             </td>
                                             <td>{{ $emp['gender_id'] == 1 ? 'ប្រុស' : 'ស្រី' }}</td>
                                             <td>{{ $emp['position']['name_kh'] ?? $emp['position']['name_short'] ?? $emp['position']['abb'] ?? 'N/A' }}</td>
-                                            <td>{{ $emp->department_name ?? $emp['department']['name_kh'] ?? 'N/A' }}</td>
-                                            <td>{{ $emp->sub_department_name ?? 'N/A' }}</td>
+                                            <td><span class="dept-cell">{{ $emp->department_name ?? $emp['department']['name_kh'] ?? 'N/A' }}</span></td>
+                                            <td><span class="dept-cell">{{ $emp->sub_department_name ?? 'N/A' }}</span></td>
                                             <td>
                                                 @if(! empty($imageName))
                                                     <a href="{{ route('civil-servants.download-photo', $emp->id) }}"

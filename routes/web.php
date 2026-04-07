@@ -6,6 +6,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use Illuminate\Support\Facades\Route;
 
+
 Route::get('/', function () {
     return redirect()->route('dashboard.index');
 });
@@ -27,9 +28,4 @@ Route::get('/civil-servants/download-photo/{civil_servant_id}', [CivilServantPho
 Route::get('/civil-servants/download-department/{department_id}', [DepartmentController::class, 'downloadDepartment'])->name('civil-servants.download-department');
 Route::get('/civil-servants/department-photo-list/{department_id}', [DepartmentController::class, 'departmentPhotoList'])->name('civil-servants.department-photo-list');
 
-// Load Debugbar routes if the package is available and enabled
-if (class_exists(\Barryvdh\Debugbar\ServiceProvider::class) && config('debugbar.enabled')) {
-    if (file_exists(base_path('vendor/barryvdh/laravel-debugbar/src/debugbar-routes.php'))) {
-        require base_path('vendor/barryvdh/laravel-debugbar/src/debugbar-routes.php');
-    }
-}
+// Debugbar registers its own routes via its service provider; no manual include needed.

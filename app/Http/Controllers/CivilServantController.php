@@ -37,24 +37,14 @@ class CivilServantController extends Controller
 
         $filters = $request->only(['name_kh', 'department_id', 'parent_id', 'position_id', 'sort_by', 'sort_dir']);
 
+        // Use eager-loaded relationships and compute department/parent data via relationships
         $query = CivilServant::with([
-            'department:id,name_kh,parent_id',
+            'department.parent.parent',
             'position:id,name_kh,name_short,abb,sort',
             'images' => function ($q) {
                 $q->select('id', 'civil_servant_id', 'name');
             },
-        ])
-            ->select('civil_servants.*')
-            ->leftJoin('departments as dept', 'dept.id', '=', 'civil_servants.department_id')
-            ->leftJoin('departments as sub_dept', 'sub_dept.id', '=', 'dept.parent_id')
-            ->leftJoin('departments as parent_dept', 'parent_dept.id', '=', 'sub_dept.parent_id')
-            ->addSelect(
-                'dept.name_kh as department_name',
-                'sub_dept.id as sub_department_id',
-                'sub_dept.name_kh as sub_department_name',
-                'parent_dept.id as parent_department_id',
-                'parent_dept.name_kh as parent_department_name',
-            );
+        ])->select('civil_servants.*');
         $this->applyFilters($query, $request);
         $this->applySorting($query, $request);
 
@@ -127,8 +117,23 @@ class CivilServantController extends Controller
             ? ($deptGroupMap[$deptIdForLink] ?? $departments->firstWhere('id', $deptIdForLink)?->name_kh ?? 'department')
             : null;
 
+        $paginated = $query->paginate(20)->withQueryString();
+        $paginated->getCollection()->transform(function ($cs) {
+            $dept = $cs->department;
+            $sub = $dept?->parent;
+            $parent = $sub?->parent;
+
+            $cs->department_name = $dept->name_kh ?? null;
+            $cs->sub_department_id = $sub->id ?? null;
+            $cs->sub_department_name = $sub->name_kh ?? null;
+            $cs->parent_department_id = $parent->id ?? null;
+            $cs->parent_department_name = $parent->name_kh ?? null;
+
+            return $cs;
+        });
+
         return view('civil-servants.index', [
-            'civilServants' => $query->paginate(20)->withQueryString(),
+            'civilServants' => $paginated,
             'subDepartments' => $departments,
             'childDepartments' => $childDepartments,
             'allChildDepts' => $allChildDepts,
@@ -168,24 +173,14 @@ class CivilServantController extends Controller
             return response()->json(['input' => $request->all()]);
         }
 
+        // Eager-load department chain and related models for JSON responses
         $query = CivilServant::with([
-            'department:id,name_kh,parent_id',
+            'department.parent.parent',
             'position:id,name_kh,name_short,abb,sort',
             'images' => function ($q) {
                 $q->select('id', 'civil_servant_id', 'name');
             },
-        ])
-            ->select('civil_servants.*')
-            ->leftJoin('departments as dept', 'dept.id', '=', 'civil_servants.department_id')
-            ->leftJoin('departments as sub_dept', 'sub_dept.id', '=', 'dept.parent_id')
-            ->leftJoin('departments as parent_dept', 'parent_dept.id', '=', 'sub_dept.parent_id')
-            ->addSelect(
-                'dept.name_kh as department_name',
-                'sub_dept.id as sub_department_id',
-                'sub_dept.name_kh as sub_department_name',
-                'parent_dept.id as parent_department_id',
-                'parent_dept.name_kh as parent_department_name',
-            );
+        ])->select('civil_servants.*');
         $this->applyFilters($query, $request);
         $this->applySorting($query, $request);
 
@@ -196,6 +191,17 @@ class CivilServantController extends Controller
             $cs->images = $cs->images->filter(function ($img) {
                 return $this->isValidImageName($img->name ?? null);
             })->values();
+
+            $dept = $cs->department;
+            $sub = $dept?->parent;
+            $parent = $sub?->parent;
+
+            $cs->department_name = $dept->name_kh ?? null;
+            $cs->sub_department_id = $sub->id ?? null;
+            $cs->sub_department_name = $sub->name_kh ?? null;
+            $cs->parent_department_id = $parent->id ?? null;
+            $cs->parent_department_name = $parent->name_kh ?? null;
+
             return $cs;
         });
 

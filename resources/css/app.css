@@ -9,3 +9,29 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+/* Khmer fonts: place TTF files in public/fonts/ */
+@font-face {
+    font-family: 'Khmer OS Siemreap';
+    src: url('/fonts/KhmerOSSiemreap-Regular.woff2') format('woff2'),
+             url('/fonts/KhmerOSSiemreap-Regular.woff') format('woff'),
+             url('/fonts/KhmerOSSiemreap-Regular.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Khmer OS Muol Light';
+    src: url('/fonts/KhmerOSMuolLight.woff2') format('woff2'),
+             url('/fonts/KhmerOSMuolLight.woff') format('woff'),
+             url('/fonts/KhmerOSMuolLight.ttf') format('truetype');
+    font-weight: 300;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Use Khmer fonts as primary for the site; fall back to existing sans var */
+html, body, input, textarea, button, select {
+    font-family: 'Khmer OS Muol Light', 'Khmer OS Siemreap', var(--font-sans);
+}

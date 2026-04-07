@@ -384,6 +384,16 @@ body { background: var(--bg); color: var(--text); min-height: 100vh; display: fl
 .table-custom tbody tr { transition: background .1s; }
 .table-custom tbody tr:hover { background: var(--primary-light); }
 
+/* Truncate long department names in table cells */
+.dept-cell {
+    display: inline-block;
+    max-width: 120px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+}
+
 /* Badge */
 .badge-gender {
     display: inline-flex;
