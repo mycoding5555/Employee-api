@@ -154,7 +154,7 @@
                                                 <i class="bi bi-chevron-expand text-muted"></i>
                                             @endif
                                         </th>
-                                        <th class="sortable-th" data-sort="department_id">
+                                        <th class="sortable-th" data-sort="department_id" style="max-width:160px;white-space:normal;word-break:break-word;">
                                             អង្គភាព/អគ្គនាយកដ្ឋាន
                                             @if($currentSortBy === 'department_id')
                                                 <i class="bi bi-chevron-{{ $currentSortDir === 'asc' ? 'up' : 'down' }}"></i>
@@ -163,7 +163,6 @@
                                             @endif
                                         </th>
                                         <th>អង្គភាព/នាយកដ្ឋាន</th>
-                                       
                                         <th style="width:160px">ទាញយករូបថត</th>
                                     </tr>
                                 </thead>
@@ -181,7 +180,7 @@
                                         @endphp
                                         @if($currentSortBy === 'position_id' && $positionName !== $lastPositionName)
                                             <tr class="position-group-row">
-                                                <td colspan="9">
+                                                <td colspan="8">
                                                     <strong><i class="bi bi-bookmark-fill me-1"></i>{{ $positionName }}</strong>
                                                 </td>
                                             </tr>
@@ -189,7 +188,7 @@
                                         @endif
                                         @if($currentSortBy === 'department_id' && $nayokName !== $lastDepartmentName)
                                             <tr class="position-group-row">
-                                                <td colspan="9">
+                                                <td colspan="8">
                                                     <strong><i class="bi bi-building me-1"></i>{{ $nayokName }}</strong>
                                                 </td>
                                             </tr>
@@ -237,7 +236,6 @@
                                             <td>{{ $emp['position']['name_kh'] ?? $emp['position']['name_short'] ?? $emp['position']['abb'] ?? 'N/A' }}</td>
                                             <td>{{ $emp->department_name ?? $emp['department']['name_kh'] ?? 'N/A' }}</td>
                                             <td>{{ $emp->sub_department_name ?? 'N/A' }}</td>
-                                         
                                             <td>
                                                 @if(! empty($imageName))
                                                     <a href="{{ route('civil-servants.download-photo', $emp->id) }}"
@@ -612,7 +610,7 @@
                 // Position group header row
                 if (currentSortBy === 'position_id' && title !== lastPositionName) {
                     rows += `<tr class="position-group-row">
-                        <td colspan="9"><strong><i class="bi bi-bookmark-fill me-1"></i>${title}</strong></td>
+                        <td colspan="8"><strong><i class="bi bi-bookmark-fill me-1"></i>${title}</strong></td>
                     </tr>`;
                     lastPositionName = title;
                 }
@@ -620,7 +618,7 @@
                 // Department group header row
                 if (currentSortBy === 'department_id' && deptName !== lastPositionName) {
                     rows += `<tr class="position-group-row">
-                        <td colspan="9"><strong><i class="bi bi-building me-1"></i>${deptName}</strong></td>
+                        <td colspan="8"><strong><i class="bi bi-building me-1"></i>${deptName}</strong></td>
                     </tr>`;
                     lastPositionName = deptName;
                 }
@@ -640,7 +638,7 @@
                     : fallbackAvatar;
 
                 const subDeptName = emp.sub_department_name ? escapeHtml(emp.sub_department_name) : (emp.sub_department ? escapeHtml(emp.sub_department.name_kh || '') : 'N/A');
-                const parentDeptName = emp.parent_department_name ? escapeHtml(emp.parent_department_name) : (emp.parent_department ? escapeHtml(emp.parent_department.name_kh || '') : 'N/A');
+            
 
                 rows += `<tr data-download-url="/civil-servants/download-photo/${encodeURIComponent(emp.id)}">
                     <td class="text-muted fw-medium">${globalIndex}</td>
@@ -650,7 +648,6 @@
                     <td>${title}</td>
                     <td>${deptName}</td>
                     <td>${subDeptName}</td>
-                    <td>${parentDeptName}</td>
                     <td>${photoCell}</td>
                 </tr>`;
             });
@@ -692,13 +689,12 @@
                     <div class="table-responsive">
                         <table class="table-custom table">
                             <thead><tr>
-                                <th style="width:60px">អត្តលេខ</th>
+                                <th style="width:60px">លេខរៀង</th>
                                 <th>រូបថត</th>
                                 <th class="sortable-th-js" data-sort="last_name_kh">គោត្តនាម និងនាម ${sortIcon('last_name_kh')}</th>
                                 <th class="sortable-th-js" data-sort="gender_id">ភេទ ${sortIcon('gender_id')}</th>
                                 <th class="sortable-th-js" data-sort="position_id">តួនាទី/មុខតំណែង ${sortIcon('position_id')}</th>
-                                <th class="sortable-th-js" data-sort="department_id">អង្គភាព/អគ្គនាយកដ្ឋាន ${sortIcon('department_id')}</th>
-                                <th>អង្គភាព/អគ្គនាយកដ្ឋាន</th>
+                                <th class="sortable-th-js" data-sort="department_id" style="max-width:160px;white-space:normal;word-break:break-word;">អង្គភាព/អគ្គនាយកដ្ឋាន ${sortIcon('department_id')}</th>
                                 <th>អង្គភាព/នាយកដ្ឋាន</th>
                                 <th style="width:160px">ទាញយករូបថត</th>
                             </tr></thead>
