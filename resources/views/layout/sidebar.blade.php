@@ -19,12 +19,19 @@
         </li>
     </ul>
 
-    <div class="sidebar-section-label">គ្រប់គ្រង</div>
-    <ul class="sidebar-nav">
+    <div class="sidebar-section-label ">គ្រប់គ្រង</div>
+    <ul class="sidebar-nav mb-4">
         <li class="sidebar-nav-item">
             <a href="{{ route('civil-servants.index') }}" class="sidebar-link {{ request()->routeIs('civil-servants.*') ? 'active' : '' }}" data-tooltip="បោះពុម្ភរូបថត">
                 <span class="sidebar-link-icon"><i class="bi bi-camera-fill"></i></span>
                 <span class="sidebar-link-text">បោះពុម្ភរូបថត</span>
+            </a>
+        </li>
+
+        <li class="sidebar-nav-item">
+            <a href="{{ route('civilservant-id.index') }}" class="sidebar-link {{ request()->routeIs('civilservant-id.*') ? 'active' : '' }}" data-tooltip="អត្តលេខមន្រ្តីរាជការ">
+                <span class="sidebar-link-icon"><i class="bi bi-person-badge-fill"></i></span>
+                <span class="sidebar-link-text">អត្តលេខមន្រ្តីរាជការ</span>
             </a>
         </li>
     </ul>

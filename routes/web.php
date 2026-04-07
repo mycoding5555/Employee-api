@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CivilservantIdController;
 use App\Http\Controllers\CivilServantController;
 use App\Http\Controllers\CivilServantPhotoController;
 use App\Http\Controllers\DashboardController;
@@ -27,5 +28,8 @@ Route::get('/civil-servants/download-photo/{civil_servant_id}', [CivilServantPho
 // Department-level operations
 Route::get('/civil-servants/download-department/{department_id}', [DepartmentController::class, 'downloadDepartment'])->name('civil-servants.download-department');
 Route::get('/civil-servants/department-photo-list/{department_id}', [DepartmentController::class, 'departmentPhotoList'])->name('civil-servants.department-photo-list');
+
+// Civil servant ID documents
+Route::get('/civilservant-id', [CivilservantIdController::class, 'index'])->name('civilservant-id.index');
 
 // Debugbar registers its own routes via its service provider; no manual include needed.

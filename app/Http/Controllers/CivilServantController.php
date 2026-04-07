@@ -132,7 +132,7 @@ class CivilServantController extends Controller
             return $cs;
         });
 
-        return view('civil-servants.index', [
+        return view('civil_servants_photo.index', [
             'civilServants' => $paginated,
             'subDepartments' => $departments,
             'childDepartments' => $childDepartments,
