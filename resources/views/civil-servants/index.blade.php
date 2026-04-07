@@ -162,8 +162,8 @@
                                                 <i class="bi bi-chevron-expand text-muted"></i>
                                             @endif
                                         </th>
-                                        <th>អង្គភាព/អគ្គនាយកដ្ឋាន</th>
                                         <th>អង្គភាព/នាយកដ្ឋាន</th>
+                                       
                                         <th style="width:160px">ទាញយករូបថត</th>
                                     </tr>
                                 </thead>
@@ -237,7 +237,7 @@
                                             <td>{{ $emp['position']['name_kh'] ?? $emp['position']['name_short'] ?? $emp['position']['abb'] ?? 'N/A' }}</td>
                                             <td>{{ $emp->department_name ?? $emp['department']['name_kh'] ?? 'N/A' }}</td>
                                             <td>{{ $emp->sub_department_name ?? 'N/A' }}</td>
-                                            <td>{{ $emp->parent_department_name ?? 'N/A' }}</td>
+                                         
                                             <td>
                                                 @if(! empty($imageName))
                                                     <a href="{{ route('civil-servants.download-photo', $emp->id) }}"

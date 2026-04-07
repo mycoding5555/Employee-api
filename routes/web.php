@@ -25,3 +25,19 @@ Route::get('/civil-servants/download-photo/{civil_servant_id}', [CivilServantPho
 // Department-level operations
 Route::get('/civil-servants/download-department/{department_id}', [DepartmentController::class, 'downloadDepartment'])->name('civil-servants.download-department');
 Route::get('/civil-servants/department-photo-list/{department_id}', [DepartmentController::class, 'departmentPhotoList'])->name('civil-servants.department-photo-list');
+
+// Load Debugbar routes if the package is available and enabled (ensures assets and handlers are registered)
+if (file_exists(base_path('vendor/barryvdh/laravel-debugbar/src/debugbar-routes.php')) && config('debugbar.enabled')) {
+    require base_path('vendor/barryvdh/laravel-debugbar/src/debugbar-routes.php');
+}
+
+// Fallback: explicitly register essential Debugbar routes in case the package didn't register them
+if (class_exists(\Fruitcake\LaravelDebugbar\Controllers\AssetController::class) && config('debugbar.enabled')) {
+    Route::prefix(config('debugbar.route_prefix', '_debugbar'))->group(function () {
+        Route::get('open', [\Fruitcake\LaravelDebugbar\Controllers\OpenHandlerController::class, 'handle'])->name('debugbar.openhandler');
+        Route::delete('cache/{key}', [\Fruitcake\LaravelDebugbar\Controllers\CacheController::class, 'delete'])->where('key', '.*')->name('debugbar.cache.delete');
+        Route::post('queries/explain', [\Fruitcake\LaravelDebugbar\Controllers\QueriesController::class, 'explain'])->name('debugbar.queries.explain');
+        Route::get('clockwork/{id}', [\Fruitcake\LaravelDebugbar\Controllers\OpenHandlerController::class, 'clockwork'])->name('debugbar.clockwork');
+        Route::get('assets', [\Fruitcake\LaravelDebugbar\Controllers\AssetController::class, 'getAssets'])->name('debugbar.assets');
+    });
+}

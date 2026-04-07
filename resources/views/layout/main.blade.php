@@ -80,5 +80,8 @@
     })();
     </script>
     @stack('scripts')
+    @if(app()->bound('debugbar') && app('debugbar')->isEnabled())
+        {!! app('debugbar')->getJavascriptRenderer()->render() !!}
+    @endif
 </body>
 </html>
