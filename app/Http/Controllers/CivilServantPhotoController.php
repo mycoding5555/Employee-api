@@ -30,7 +30,9 @@ class CivilServantPhotoController extends Controller
 
         $localPath = $this->resolveLocalPath($civilServant, $image);
         if ($localPath) {
-            return response()->file($localPath);
+            return response()->file($localPath, [
+                'Cache-Control' => 'public, max-age=86400',
+            ]);
         }
 
         $body = $this->fetchRemotePhoto($civilServantId);

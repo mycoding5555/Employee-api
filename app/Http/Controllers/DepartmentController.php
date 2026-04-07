@@ -24,20 +24,31 @@ class DepartmentController extends Controller
 
         $deptIds = $this->departmentWithChildIds($departmentId);
 
-        $civilServants = CivilServant::with(['images', 'position', 'department'])
-            ->whereIn('department_id', $deptIds)
-            ->where('status_type_id', 1)
-            ->whereHas('images')
-            ->get()
-            ->sortBy(fn (CivilServant $cs) => $cs->position->sort ?? PHP_INT_MAX);
-
+        // For debug requests keep original behaviour (load into memory).
         if (request()->boolean('debug')) {
+            $civilServants = CivilServant::with(['images', 'position', 'department'])
+                ->whereIn('department_id', $deptIds)
+                ->where('status_type_id', 1)
+                ->whereHas('images')
+                ->get()
+                ->sortBy(fn (CivilServant $cs) => $cs->position->sort ?? PHP_INT_MAX);
+
             return $this->buildDebugResponse($departmentId, $deptIds, $civilServants);
         }
 
-        if ($civilServants->isEmpty()) {
-            return back()->with('error', 'No photos found for this department');
-        }
+        // Stream results to avoid loading all civil servants into memory.
+        $csQuery = CivilServant::with([
+            'images' => function ($q) {
+                $q->select('id', 'civil_servant_id', 'name')->orderBy('id');
+            },
+            'position:id,sort',
+            'department:id,parent_id,name_kh',
+        ])
+            ->whereIn('department_id', $deptIds)
+            ->where('status_type_id', 1)
+            ->whereHas('images');
+
+        $csIterator = $csQuery->cursor();
 
         $dept = Department::find($departmentId);
         $deptName = ($dept && ! empty($dept->name_kh)) ? $dept->name_kh : 'department_' . $departmentId;
@@ -51,8 +62,8 @@ class DepartmentController extends Controller
             $deptFolderPaths[$d->id] = $this->buildDeptFolderPath($d, $departmentId, $allDepts);
         }
 
-        // Group civil servants by their department_id
-        $grouped = $civilServants->groupBy('department_id');
+        // We'll write files to the zip as we iterate; track numbering per-department.
+        $deptCounters = [];
 
         $safeZipName = preg_replace('/[^\p{L}\p{N}_]+/u', '_', $deptName) . '.zip';
         $zipPath = storage_path('app/temp/' . $safeZipName);
@@ -73,48 +84,48 @@ class DepartmentController extends Controller
         $photoBaseUrl = $this->photoBaseUrl();
         $totalAdded = 0;
 
-        foreach ($grouped as $deptId => $members) {
+        foreach ($csIterator as $civilServant) {
+            $deptId = $civilServant->department_id;
             $folderPrefix = ($deptFolderPaths[$deptId] ?? $deptName) . '/';
 
-            $number = 1;
-            foreach ($members as $civilServant) {
-                $image = $this->firstValidImageFromCollection($civilServant->images);
-                if (! $image) {
-                    continue;
-                }
+            $image = $this->firstValidImageFromCollection($civilServant->images);
+            if (! $image) {
+                continue;
+            }
 
-                $baseName = $civilServant->last_name_kh . '_' . $civilServant->first_name_kh;
-                $numberedPrefix = $number . '_';
-                $entryName = $numberedPrefix . $baseName . '_' . $image->name;
+            $number = $deptCounters[$deptId] ?? 1;
 
-                // 1) Local storage
-                $localPath = $this->resolveLocalPath($civilServant, $image);
-                if ($localPath) {
-                    $zip->addFileFromPath(fileName: $folderPrefix . $entryName, path: $localPath);
-                    $number++;
-                    $totalAdded++;
-                    continue;
-                }
+            $baseName = $civilServant->last_name_kh . '_' . $civilServant->first_name_kh;
+            $numberedPrefix = $number . '_';
+            $entryName = $numberedPrefix . $baseName . '_' . $image->name;
 
-                // 2) HRMIS by ID
-                $body = $this->fetchRemotePhoto($civilServant->id);
+            // 1) Local storage
+            $localPath = $this->resolveLocalPath($civilServant, $image);
+            if ($localPath) {
+                $zip->addFileFromPath(fileName: $folderPrefix . $entryName, path: $localPath);
+                $deptCounters[$deptId] = $number + 1;
+                $totalAdded++;
+                continue;
+            }
+
+            // 2) HRMIS by ID
+            $body = $this->fetchRemotePhoto($civilServant->id);
+            if ($body) {
+                $ext = $this->extensionFromContentType($body['content_type']);
+                $zipEntryName = $numberedPrefix . $baseName . $ext;
+                $zip->addFile(fileName: $folderPrefix . $zipEntryName, data: $body['content']);
+                $deptCounters[$deptId] = $number + 1;
+                $totalAdded++;
+                continue;
+            }
+
+            // 3) PHOTO_BASE_URL by filename
+            if ($photoBaseUrl) {
+                $body = $this->fetchUrl($photoBaseUrl . '/' . rawurlencode($image->name));
                 if ($body) {
-                    $ext = $this->extensionFromContentType($body['content_type']);
-                    $zipEntryName = $numberedPrefix . $baseName . $ext;
-                    $zip->addFile(fileName: $folderPrefix . $zipEntryName, data: $body['content']);
-                    $number++;
+                    $zip->addFile(fileName: $folderPrefix . $entryName, data: $body['content']);
+                    $deptCounters[$deptId] = $number + 1;
                     $totalAdded++;
-                    continue;
-                }
-
-                // 3) PHOTO_BASE_URL by filename
-                if ($photoBaseUrl) {
-                    $body = $this->fetchUrl($photoBaseUrl . '/' . rawurlencode($image->name));
-                    if ($body) {
-                        $zip->addFile(fileName: $folderPrefix . $entryName, data: $body['content']);
-                        $number++;
-                        $totalAdded++;
-                    }
                 }
             }
         }
@@ -143,7 +154,9 @@ class DepartmentController extends Controller
 
         $deptIds = $this->departmentWithChildIds($departmentId);
 
-        $civilServants = CivilServant::with('images')
+        $civilServants = CivilServant::with(['images' => function ($q) {
+                $q->select('id', 'civil_servant_id', 'name');
+            }])
             ->whereIn('department_id', $deptIds)
             ->where('status_type_id', 1)
             ->whereHas('images')

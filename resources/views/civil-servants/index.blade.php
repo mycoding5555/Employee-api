@@ -100,9 +100,8 @@
                         </span>
 
                         @php
-                            $deptIdForLink = $filters['parent_id'] ?? $filters['department_id'] ?? null;
-                            $deptForLink = $deptIdForLink ? \App\Models\Department::find($deptIdForLink) : null;
-                            $deptNameForFname = $deptForLink ? $deptForLink->name_kh : 'department';
+                            $deptIdForLink = $deptIdForLink ?? ($filters['parent_id'] ?? $filters['department_id'] ?? null);
+                            $deptNameForFname = $deptNameForFname ?? ($deptIdForLink ? ($subDepartments->firstWhere('id', $deptIdForLink)?->name_kh ?? 'department') : null);
                         @endphp
                         @if($deptIdForLink)
                             <a href="{{ route('civil-servants.download-department', $deptIdForLink) }}"

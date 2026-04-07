@@ -25,9 +25,24 @@ class CivilServantController extends Controller
 
     public function index(Request $request): \Illuminate\View\View|JsonResponse
     {
+        $request->validate([
+            'name_kh' => 'nullable|string|max:255',
+            'department_id' => 'nullable|integer',
+            'parent_id' => 'nullable|integer',
+            'position_id' => 'nullable|integer',
+            'sort_by' => 'nullable|string|in:' . implode(',', self::ALLOWED_SORTS),
+            'sort_dir' => 'nullable|string|in:asc,desc',
+        ]);
+
         $filters = $request->only(['name_kh', 'department_id', 'parent_id', 'position_id', 'sort_by', 'sort_dir']);
 
-        $query = CivilServant::with(['department', 'position', 'images'])
+        $query = CivilServant::with([
+            'department:id,name_kh,parent_id',
+            'position:id,name_kh,name_short,abb,sort',
+            'images' => function ($q) {
+                $q->select('id', 'civil_servant_id', 'name');
+            },
+        ])
             ->select('civil_servants.*')
             ->leftJoin('departments as dept', 'dept.id', '=', 'civil_servants.department_id')
             ->leftJoin('departments as sub_dept', 'sub_dept.id', '=', 'dept.parent_id')
@@ -82,6 +97,23 @@ class CivilServantController extends Controller
             ->get()
             ->groupBy('parent_id');
 
+        // Build a lightweight map for grouping departments in the view to avoid repeated lookups.
+        $deptGroupMap = [];
+        foreach ($departments as $d) {
+            $deptGroupMap[$d->id] = $d->name_kh;
+            if (isset($allChildDepts[$d->id])) {
+                foreach ($allChildDepts[$d->id] as $child) {
+                    $deptGroupMap[$child->id] = $d->name_kh;
+                }
+            }
+        }
+
+        // Determine department id/name for the download link filename.
+        $deptIdForLink = $filters['parent_id'] ?? $filters['department_id'] ?? null;
+        $deptNameForFname = $deptIdForLink
+            ? ($deptGroupMap[$deptIdForLink] ?? $departments->firstWhere('id', $deptIdForLink)?->name_kh ?? 'department')
+            : null;
+
         return view('civil-servants.index', [
             'civilServants' => $query->paginate(20)->withQueryString(),
             'subDepartments' => $departments,
@@ -90,6 +122,9 @@ class CivilServantController extends Controller
             'positions' => $this->getFilteredPositions($request),
             'filters' => $filters,
             'photoBaseUrl' => $this->photoBaseUrl(),
+            'deptGroupMap' => $deptGroupMap,
+            'deptIdForLink' => $deptIdForLink,
+            'deptNameForFname' => $deptNameForFname,
         ]);
     }
 
@@ -106,11 +141,27 @@ class CivilServantController extends Controller
      */
     public function ajaxSearch(Request $request): JsonResponse
     {
+        $request->validate([
+            'name_kh' => 'nullable|string|max:255',
+            'department_id' => 'nullable|integer',
+            'parent_id' => 'nullable|integer',
+            'position_id' => 'nullable|integer',
+            'sort_by' => 'nullable|string|in:' . implode(',', self::ALLOWED_SORTS),
+            'sort_dir' => 'nullable|string|in:asc,desc',
+            'per_page' => 'nullable|integer|min:1|max:100',
+        ]);
+
         if ($request->boolean('echo')) {
             return response()->json(['input' => $request->all()]);
         }
 
-        $query = CivilServant::with(['department', 'position', 'images'])
+        $query = CivilServant::with([
+            'department:id,name_kh,parent_id',
+            'position:id,name_kh,name_short,abb,sort',
+            'images' => function ($q) {
+                $q->select('id', 'civil_servant_id', 'name');
+            },
+        ])
             ->select('civil_servants.*')
             ->leftJoin('departments as dept', 'dept.id', '=', 'civil_servants.department_id')
             ->leftJoin('departments as sub_dept', 'sub_dept.id', '=', 'dept.parent_id')

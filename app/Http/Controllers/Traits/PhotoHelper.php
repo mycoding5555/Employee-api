@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Traits;
 
 use App\Models\CivilServant;
 use App\Models\Department;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -164,19 +165,21 @@ trait PhotoHelper
 
     protected function departmentWithChildIds(int|string $departmentId): array
     {
-        $ids = collect([(int) $departmentId]);
-        $parentIds = $ids;
+        return Cache::remember('dept_children_' . $departmentId, 3600, function () use ($departmentId) {
+            $ids = collect([(int) $departmentId]);
+            $parentIds = $ids;
 
-        for ($i = 0; $i < 5; $i++) {
-            // Only include active child departments
-            $childIds = Department::whereIn('parent_id', $parentIds)->where('active', 1)->pluck('id');
-            if ($childIds->isEmpty()) {
-                break;
+            for ($i = 0; $i < 5; $i++) {
+                // Only include active child departments
+                $childIds = Department::whereIn('parent_id', $parentIds)->where('active', 1)->pluck('id');
+                if ($childIds->isEmpty()) {
+                    break;
+                }
+                $ids = $ids->merge($childIds);
+                $parentIds = $childIds;
             }
-            $ids = $ids->merge($childIds);
-            $parentIds = $childIds;
-        }
 
-        return $ids->unique()->toArray();
+            return $ids->unique()->toArray();
+        });
     }
 }
