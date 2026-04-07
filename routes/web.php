@@ -11,6 +11,7 @@ Route::get('/', function () {
 });
 
 Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard.index');
+Route::get('/dashboard/stats', [DashboardController::class, 'stats'])->name('dashboard.stats');
 
 // Civil servant listing & search
 Route::get('/civil-servants/index', [CivilServantController::class, 'index'])->name('civil-servants.index');

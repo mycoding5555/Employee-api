@@ -13,7 +13,7 @@
             <div class="stat-card stat-card--indigo">
                 <div class="stat-card__icon"><i class="bi bi-people-fill"></i></div>
                 <div class="stat-card__body">
-                    <span class="stat-card__num">{{ number_format($totalCivilServant) }}</span>
+                    <span class="stat-card__num" id="stat-total">—</span>
                     <span class="stat-card__lbl">មន្រ្តីរាជការសរុប</span>
                 </div>
             </div>
@@ -22,7 +22,7 @@
             <div class="stat-card stat-card--emerald">
                 <div class="stat-card__icon"><i class="bi bi-building"></i></div>
                 <div class="stat-card__body">
-                    <span class="stat-card__num">{{ number_format($totalDepartments) }}</span>
+                    <span class="stat-card__num" id="stat-departments">—</span>
                     <span class="stat-card__lbl">អង្គភាព / អគ្គនាយកដ្ឋាន</span>
                 </div>
             </div>
@@ -31,7 +31,7 @@
             <div class="stat-card stat-card--sky">
                 <div class="stat-card__icon"><i class="bi bi-gender-male"></i></div>
                 <div class="stat-card__body">
-                    <span class="stat-card__num">{{ number_format($totalChildDepartments)}}</span>
+                    <span class="stat-card__num" id="stat-child-departments">—</span>
                     <span class="stat-card__lbl">អង្គភាព / នាយកដ្ឋានសរុប</span>
                 </div>
             </div>
@@ -169,10 +169,8 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    var maleCount   = {{ (int) $maleCount }};
-    var femaleCount = {{ (int) $femaleCount }};
-    var hasPhoto    = {{ (int) $hasPhotoCount }};
-    var noPhoto     = {{ (int) $noPhotoCount }};
+    var genderChartInstance = null;
+    var photoChartInstance = null;
 
     Chart.defaults.font.family = "'Inter', sans-serif";
     Chart.defaults.font.size = 11;
@@ -180,41 +178,50 @@ document.addEventListener('DOMContentLoaded', function () {
     Chart.defaults.plugins.legend.labels.pointStyleWidth = 8;
     Chart.defaults.plugins.legend.labels.boxHeight = 7;
 
-    // Gender Donut
-    new Chart(document.getElementById('genderChart'), {
-        type: 'doughnut',
-        data: {
-            labels: ['ប្រុស', 'ស្រី'],
-            datasets: [{ data: [maleCount, femaleCount], backgroundColor: ['#4f46e5', '#ec4899'], borderWidth: 0 }]
-        },
-        options: {
-            cutout: '68%',
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { position: 'bottom', labels: { padding: 14 } },
-                tooltip: { callbacks: { label: function (ctx) { return ctx.label + ': ' + ctx.parsed.toLocaleString() + ' នាក់'; } } }
-            }
-        }
-    });
+    fetch('{{ route("dashboard.stats") }}')
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+            // Populate stat cards
+            document.getElementById('stat-total').textContent = Number(data.totalCivilServant).toLocaleString();
+            document.getElementById('stat-departments').textContent = Number(data.totalDepartments).toLocaleString();
+            document.getElementById('stat-child-departments').textContent = Number(data.totalChildDepartments).toLocaleString();
 
-    // Photo Donut (has / no photo)
-    new Chart(document.getElementById('photoChart'), {
-        type: 'doughnut',
-        data: {
-            labels: ['មានរូបថត', 'គ្មានរូបថត'],
-            datasets: [{ data: [hasPhoto, noPhoto], backgroundColor: ['#10b981', '#f59e0b'], borderWidth: 0 }]
-        },
-        options: {
-            cutout: '68%',
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { position: 'bottom', labels: { padding: 10 } },
-                tooltip: { callbacks: { label: function (ctx) { return ctx.label + ': ' + ctx.parsed.toLocaleString() + ' នាក់'; } } }
-            }
-        }
-    });
+            // Gender Donut
+            genderChartInstance = new Chart(document.getElementById('genderChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['ប្រុស', 'ស្រី'],
+                    datasets: [{ data: [data.maleCount, data.femaleCount], backgroundColor: ['#4f46e5', '#ec4899'], borderWidth: 0 }]
+                },
+                options: {
+                    cutout: '68%',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { padding: 14 } },
+                        tooltip: { callbacks: { label: function (ctx) { return ctx.label + ': ' + ctx.parsed.toLocaleString() + ' នាក់'; } } }
+                    }
+                }
+            });
+
+            // Photo Donut
+            photoChartInstance = new Chart(document.getElementById('photoChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['មានរូបថត', 'គ្មានរូបថត'],
+                    datasets: [{ data: [data.hasPhotoCount, data.noPhotoCount], backgroundColor: ['#10b981', '#f59e0b'], borderWidth: 0 }]
+                },
+                options: {
+                    cutout: '68%',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { padding: 10 } },
+                        tooltip: { callbacks: { label: function (ctx) { return ctx.label + ': ' + ctx.parsed.toLocaleString() + ' នាក់'; } } }
+                    }
+                }
+            });
+        });
 });
 </script>
 @endpush

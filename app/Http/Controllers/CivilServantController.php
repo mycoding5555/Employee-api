@@ -9,6 +9,7 @@ use App\Models\Position;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class CivilServantController extends Controller
 {
@@ -57,21 +58,30 @@ class CivilServantController extends Controller
         $this->applyFilters($query, $request);
         $this->applySorting($query, $request);
 
-        $departments = Department::where(function ($q) {
-                $q->whereIn('parent_id', [1, 2])
-                    ->orWhereIn('id', [1, 2]);
-            })->where('active', 1)
+        $departments = Cache::remember('dept_tree_top', 300, function () {
+            return Department::select('id', 'name_kh', 'parent_id', 'sort', 'active')
+                ->where(function ($q) {
+                    $q->whereIn('parent_id', [1, 2])
+                        ->orWhereIn('id', [1, 2]);
+                })->where('active', 1)
                 ->orderByRaw('CASE WHEN id = ? OR parent_id = ? THEN 0 WHEN id = ? OR parent_id = ? THEN 2 ELSE 1 END ASC', [1, 1, 2, 2])
                 ->orderByRaw('CASE WHEN id IN (?, ?) THEN 0 ELSE 1 END ASC', [1, 2])
                 ->orderByRaw('COALESCE(`sort`, id) ASC')
-                ->get();
+                ->get()->toArray();
+        });
+        $departments = collect($departments)->map(fn ($d) => (object) $d);
 
-        $childDepartments = [];
+        $childDepartments = collect();
         if ($request->filled('department_id')) {
-            $childDepartments = Department::where('parent_id', $request->input('department_id'))
-                ->where('active', 1)
-                ->orderBy('sort')
-                ->get();
+            $deptId = $request->input('department_id');
+            $childDepartments = Cache::remember('dept_children_list_' . $deptId, 300, function () use ($deptId) {
+                return Department::select('id', 'name_kh', 'parent_id', 'sort')
+                    ->where('parent_id', $deptId)
+                    ->where('active', 1)
+                    ->orderBy('sort')
+                    ->get()->toArray();
+            });
+            $childDepartments = collect($childDepartments)->map(fn ($d) => (object) $d);
         }
 
         if ($request->boolean('departments_debug')) {
@@ -91,11 +101,14 @@ class CivilServantController extends Controller
             ]);
         }
 
-        $allChildDepts = Department::whereIn('parent_id', $departments->pluck('id'))
-            ->where('active', 1)
-            ->orderBy('sort')
-            ->get()
-            ->groupBy('parent_id');
+        $allChildDepts = Cache::remember('dept_tree_all_children', 300, function () use ($departments) {
+            return Department::select('id', 'name_kh', 'parent_id', 'sort')
+                ->whereIn('parent_id', $departments->pluck('id'))
+                ->where('active', 1)
+                ->orderBy('sort')
+                ->get()->toArray();
+        });
+        $allChildDepts = collect($allChildDepts)->map(fn ($d) => (object) $d)->groupBy('parent_id');
 
         // Build a lightweight map for grouping departments in the view to avoid repeated lookups.
         $deptGroupMap = [];
@@ -246,9 +259,8 @@ class CivilServantController extends Controller
 
     private function getFilteredPositions(Request $request): \Illuminate\Database\Eloquent\Collection
     {
-        $posQuery = Position::where('active', 1)->whereHas('civilServants', function ($q) {
-            $q->where('status_type_id', 1);
-        });
+        $posQuery = Position::select('id', 'name_kh', 'name_short', 'abb', 'sort')
+            ->where('active', 1);
 
         if ($request->filled('parent_id')) {
             $deptIds = $this->departmentWithChildIds($request->input('parent_id'));
@@ -259,6 +271,10 @@ class CivilServantController extends Controller
             $deptIds = $this->departmentWithChildIds($request->input('department_id'));
             $posQuery->whereHas('civilServants', function ($q) use ($deptIds) {
                 $q->where('status_type_id', 1)->whereIn('department_id', $deptIds);
+            });
+        } else {
+            $posQuery->whereHas('civilServants', function ($q) {
+                $q->where('status_type_id', 1);
             });
         }
 
