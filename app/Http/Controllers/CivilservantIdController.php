@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class CivilservantIdController extends Controller
 {
@@ -287,7 +288,7 @@ class CivilservantIdController extends Controller
     private function getCivilServantIdsWithIdCard(): \Illuminate\Support\Collection
     {
         $ids = Cache::remember('civil_servant_ids_with_id_card', 300, function () {
-            return \DB::table('document_deltas')
+            return DB::table('document_deltas')
                 ->join('documents', 'documents.id', '=', 'document_deltas.document_id')
                 ->where('documents.document_type_id', 10)
                 ->distinct()

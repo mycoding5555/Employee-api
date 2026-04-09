@@ -6,7 +6,7 @@
 
     <div class="sidebar-brand">
         <span class="sidebar-brand-icon"><img src="{{ asset('images/1-logo.png') }}" alt="Logo"></span>
-        <span class="sidebar-brand-text">មុខងារបោះពុម្ភរបាយការណ៍</span>
+        <span class="sidebar-brand-text">ក្រសួងសេដ្ឋកិច្ចនិងហិរញ្ញវត្ថុ</span>
     </div>
 
     <div class="sidebar-section-label">ទំព័រមុខ</div>

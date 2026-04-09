@@ -19,7 +19,7 @@
     <nav class="app-navbar">
         <div class="container">
             <div class="brand" onclick="window.location='{{ route('dashboard.index') }}'">
-                ប្រព័ន្ធគ្រប់គ្រងបុគ្គលិក នៃក្រសួងសេដ្ឋកិច្ចនិងហិរញ្ញវត្ថុ
+                មុខងារវិភាគទិន្នន័យធនធានមនុស្ស នៃក្រសួងសេដ្ឋកិច្ចនិងហិរញ្ញវត្ថុ
             </div>
         </div>
     </nav>
