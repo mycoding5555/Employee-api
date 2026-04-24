@@ -33,5 +33,10 @@ Route::get('/civil-servants/department-photo-list/{department_id}', [DepartmentC
 Route::get('/civilservant-id', [CivilservantIdController::class, 'index'])->name('civilservant-id.index');
 Route::get('/civilservant-id/ajax-search', [CivilservantIdController::class, 'ajaxSearch'])->middleware('throttle:60,1')->name('civilservant-id.ajax-search');
 Route::get('/civilservant-id/download-pdf', [CivilservantIdController::class, 'downloadPdf'])->name('civilservant-id.download-pdf');
+Route::get('/civilservant-id/download/{id}', [CivilservantIdController::class, 'downloadSinglePdf'])->name('civilservant-id.download-single');
+Route::get('/civilservant-id/{id}/download-delta-doc', [CivilservantIdController::class, 'downloadDeltaDocPdf'])->name('civilservant-id.download-delta-doc');
+Route::get('/civilservant-id/{id}/download-id-card-doc', [CivilservantIdController::class, 'downloadIdCardDocPdf'])->name('civilservant-id.download-id-card-doc');
+// Department-level ID card downloads
+Route::get('/civilservant-id/download-department/{department_id}', [CivilservantIdController::class, 'downloadDepartment'])->name('civilservant-id.download-department');
 
 // Debugbar registers its own routes via its service provider; no manual include needed.

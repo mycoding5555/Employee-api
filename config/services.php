@@ -36,9 +36,12 @@ return [
     ],
 
     'hrmis' => [
-   
-        'photo_base_url' => env('PHOTO_BASE_URL', ''),
-        'photo_api_base' => env('HRMIS_PHOTO_BASE', 'https://mef-pd.net/hrmis/api/profile_image'),
+        'photo_base_url'    => env('PHOTO_BASE_URL', ''),
+        'photo_api_base'    => env('HRMIS_PHOTO_BASE', 'https://mef-pd.net/hrmis/api/profile_image'),
+        'document_base_url' => env('HRMIS_DOCUMENT_BASE', 'https://mef-pd.net/hrmis/civilservant/viewDocument'),
+        'login_url'         => env('HRMIS_LOGIN_URL', 'https://mef-pd.net/hrmis/postLogin'),
+        'username'          => env('HRMIS_USERNAME', ''),
+        'password'          => env('HRMIS_PASSWORD', ''),
     ],
 
 ];

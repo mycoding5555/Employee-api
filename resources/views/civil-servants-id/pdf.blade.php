@@ -10,7 +10,7 @@
             box-sizing: border-box;
         }
         body {
-            font-family: 'khmeros', sans-serif;
+            font-family: 'khmerossiemreap', 'khmerosmuollight', 'khmeros', sans-serif;
             font-size: 11px;
             line-height: 1.4;
             color: #333;
@@ -22,6 +22,7 @@
             border-bottom: 2px solid #1a56db;
         }
         .header h1 {
+            font-family: 'khmerosmuollight', 'khmeros', sans-serif;
             font-size: 16px;
             font-weight: bold;
             color: #1a56db;

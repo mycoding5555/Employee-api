@@ -34,7 +34,7 @@ class Civilservant_Id extends Model
     protected static function booted(): void
     {
         static::addGlobalScope('civilservant_id', function (Builder $builder) {
-            $builder->where('documents.document_type_id', 10);
+            $builder->where('documents.document_type_id', 16);
         });
     }
 

@@ -139,9 +139,19 @@ class DepartmentController extends Controller
             return back()->with('error', 'No photo files found on disk');
         }
 
-        return response()->download($zipPath, $deptName . '.zip', [
+        $downloadName = $deptName . '.zip';
+        // ASCII fallback for zip filename
+        $asciiDownload = preg_replace('/[^\x20-\x7E]/', '', $downloadName);
+        $asciiDownload = trim($asciiDownload, '-_ ');
+        if (empty($asciiDownload)) {
+            $asciiDownload = 'department-' . $departmentId . '.zip';
+        }
+        $headers = [
             'Content-Type' => 'application/zip',
-        ])->deleteFileAfterSend(true);
+            'Content-Disposition' => "attachment; filename=\"{$asciiDownload}\"; filename*=UTF-8''" . rawurlencode($downloadName),
+        ];
+
+        return response()->download($zipPath, $downloadName, $headers)->deleteFileAfterSend(true);
     }
 
     /**

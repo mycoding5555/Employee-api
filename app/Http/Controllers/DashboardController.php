@@ -25,7 +25,7 @@ class DashboardController extends Controller
 
         $hasIdCardCount = DB::table('document_deltas')
             ->join('documents', 'documents.id', '=', 'document_deltas.document_id')
-            ->where('documents.document_type_id', 10)
+            ->where('documents.document_type_id', 16)
             ->whereIn('document_deltas.civil_servant_id', function ($q) {
                 $q->select('id')->from('civil_servants')->where('status_type_id', 1);
             })

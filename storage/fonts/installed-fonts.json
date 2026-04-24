@@ -2,5 +2,11 @@
     "khmeros": {
         "normal": "\/Users\/sarotmoniodom\/employee-api\/storage\/fonts\/khmeros_normal_f2d60cc001d19f6608710bf14d85db1e",
         "bold": "khmeros_bold_58d1ac25d214cfb243c0e3bfb55a7b90"
+    },
+    "khmerossiemreap": {
+        "normal": "khmerossiemreap_normal_2442aba8f6fbab41e1e7a76ffb672737"
+    },
+    "khmerosmuollight": {
+        "normal": "khmerosmuollight_300_6e4e11d42f0f55f10607b36caa7593e9"
     }
 }

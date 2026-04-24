@@ -94,7 +94,7 @@
         @if(isset($civilServants))
             <div class="mt-4 mb-4">
                 <div class="app-card">
-                    <div class="card-header-custom">
+                    <div class="card-header-custom d-flex align-items-center">
                         <span class="result-count">
                             <i class="bi bi-people"></i> {{ $civilServants->total() }} មន្រ្តីរាជការរកឃើញ
                         </span>
@@ -103,19 +103,15 @@
                             $deptIdForLink = $deptIdForLink ?? ($filters['parent_id'] ?? $filters['department_id'] ?? null);
                             $deptNameForFname = $deptNameForFname ?? ($deptIdForLink ? ($subDepartments->firstWhere('id', $deptIdForLink)?->name_kh ?? 'department') : null);
                         @endphp
-                        @if($deptIdForLink)
-                            <a href="{{ route('civil-servants.download-department', $deptIdForLink) }}"
-                               data-fname="{{ $deptNameForFname }}.zip"
-                               class="btn btn-success-custom">
-                                <i class="bi bi-file-earmark-zip me-1"></i> ទាញយករូបថតតាមនាយកដ្ឋាន
-                            </a>
-                        @else
-                            <a href="{{ route('civil-servants.download-department', 7) }}"
-                               data-fname="ទាំងអស់.zip"
-                               class="btn btn-success-custom">
-                                <i class="bi bi-file-earmark-zip me-1"></i> ទាញយករូបថតទាំងអស់
-                            </a>
-                        @endif
+                        <div class="ms-auto d-flex gap-2">
+                            @if($deptIdForLink)
+                                <a href="{{ route('civil-servants.download-department', $deptIdForLink) }}"
+                                   data-fname="{{ $deptNameForFname }}.zip"
+                                   class="btn btn-success-custom">
+                                    <i class="bi bi-file-earmark-zip me-1"></i> ទាញយករូបថតតាមនាយកដ្ឋាន
+                                </a>
+                            @endif
+                        </div>
                     </div>
 
                     @if($civilServants->total() > 0)
@@ -272,6 +268,13 @@
             {{-- Initial state before search --}}
             <div class="mt-4 mb-4">
                 <div class="app-card">
+                    <div class="card-header-custom d-flex align-items-center justify-content-end">
+                        <a href="{{ route('civil-servants.download-department', 7) }}"
+                           data-fname="ទាំងអស់.zip"
+                           class="btn btn-success-custom">
+                            <i class="bi bi-file-earmark-zip me-1"></i> ទាញយករូបថតទាំងអស់
+                        </a>
+                    </div>
                     <div class="empty-state">
                         <div class="empty-state-icon"><i class="bi bi-search"></i></div>
                         <h5>Search for civil servants</h5>
@@ -571,7 +574,7 @@
             if (total === 0) {
                 resultsContainer.innerHTML = `
                     <div class="mt-4 mb-4"><div class="app-card">
-                        <div class="card-header-custom">
+                        <div class="card-header-custom d-flex align-items-center">
                             <span class="result-count"><i class="bi bi-people"></i> 0 មន្រ្តីរាជការរកឃើញ</span>
                         </div>
                         <div class="empty-state">
@@ -681,9 +684,9 @@
 
             resultsContainer.innerHTML = `
                 <div class="mt-4 mb-4"><div class="app-card">
-                    <div class="card-header-custom">
+                    <div class="card-header-custom d-flex align-items-center">
                         <span class="result-count"><i class="bi bi-people"></i> ${total} មន្រ្តីរាជការរកឃើញ</span>
-                        ${downloadBtn}
+                        <div class="ms-auto">${downloadBtn}</div>
                     </div>
                     <div class="table-responsive">
                         <table class="table-custom table">
