@@ -761,6 +761,33 @@ class CivilservantIdController extends Controller
             }
         }
 
+        // Generate a PDF list and place it in the root of the ZIP
+        $idCardIds   = $this->getCivilServantIdsWithIdCard();
+        $pdfServants = \App\Models\CivilServant::with([
+                'department.parent',
+                'position:id,name_kh,name_short,abb,sort',
+            ])
+            ->whereIn('department_id', $deptIds)
+            ->where('status_type_id', 1)
+            ->orderBy('position_id')
+            ->get()
+            ->map(fn($cs) => $this->transformForPdf($cs, $idCardIds));
+
+        if ($pdfServants->isNotEmpty()) {
+            $html = view('civil-servants-id.pdf', [
+                'civilServants' => $pdfServants,
+                'total'         => $pdfServants->count(),
+                'offset'        => 0,
+            ])->render();
+
+            $mpdf = $this->createMpdf('A4-L');
+            $mpdf->WriteHTML($html);
+            $pdfContent = $mpdf->Output('', 'S');
+
+            $safePdfName = (trim(preg_replace('/[\/\\\\:*?"<>|\x00-\x1F]/', '', $deptName)) ?: 'list') . '-list.pdf';
+            $zip->addFile(fileName: $safePdfName, data: $pdfContent);
+        }
+
         $zip->finish();
         fclose($outputStream);
 
@@ -770,13 +797,19 @@ class CivilservantIdController extends Controller
             return back()->with('error', 'No ID card documents found for this department');
         }
 
-        $downloadName = $deptName . '-id-cards.zip';
-        $headers = [
-            'Content-Type' => 'application/zip',
-            'Content-Disposition' => "attachment; filename*=UTF-8''" . rawurlencode($downloadName),
-        ];
+        $downloadName = $deptName . '-list.zip';
 
-        return response()->download($zipPath, $downloadName, $headers)->deleteFileAfterSend(true);
+        return response()->streamDownload(function () use ($zipPath) {
+            $stream = fopen($zipPath, 'rb');
+            while (! feof($stream)) {
+                echo fread($stream, 65536);
+            }
+            fclose($stream);
+            @unlink($zipPath);
+        }, null, [
+            'Content-Type'        => 'application/zip',
+            'Content-Disposition' => "attachment; filename*=UTF-8''" . rawurlencode($downloadName),
+        ]);
     }
 
     private function applyFilters(Builder $query, Request $request): void

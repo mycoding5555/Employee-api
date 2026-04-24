@@ -314,6 +314,7 @@
         let currentPage = 1;
         let currentDeptId = '';
         let currentDeptName = '';
+        let currentGeneralDeptName = '';
         let currentPosId = '';
         let currentSortBy = sortByInput.value || 'position_id';
         let currentSortDir = sortDirInput.value || 'asc';
@@ -393,7 +394,8 @@
             const params = new URLSearchParams();
             const name = nameInput.value.trim();
             currentDeptId = deptSelect.value;
-            currentDeptName = deptSelect.options[deptSelect.selectedIndex]?.text?.trim() || '';
+            currentDeptName = deptSelect.value ? (deptSelect.options[deptSelect.selectedIndex]?.text?.trim() || '') : '';
+            currentGeneralDeptName = generalDeptSelect.value ? (generalDeptSelect.options[generalDeptSelect.selectedIndex]?.text?.trim() || '') : '';
             currentPosId = posSelect.value;
             const generalDeptId = generalDeptSelect.value;
 
@@ -683,8 +685,8 @@
                 let deptDownloadBtn = '';
                 const selectedDept = deptSelect.value || generalDeptSelect.value;
                 if (selectedDept) {
-                    const safeName = currentDeptName || selectedDept;
-                    deptDownloadBtn = `<a href="${downloadDeptBase}/${selectedDept}" data-dept-label="${safeName}" class="btn btn-success-custom ms-2"><i class="bi bi-file-earmark-zip me-1"></i> ទាញយកអត្តសញ្ញាណប័ណ្ណ</a>`;
+                    const safeName = currentDeptName || currentGeneralDeptName || selectedDept;
+                    deptDownloadBtn = `<a href="${downloadDeptBase}/${selectedDept}" data-fname="${escapeHtml(safeName)}-list.zip" data-dept-label="${safeName}" class="btn btn-success-custom ms-2"><i class="bi bi-file-earmark-zip me-1"></i> ទាញយកអត្តសញ្ញាណប័ណ្ណ</a>`;
                 } else {
                     deptDownloadBtn = `<button class="btn btn-outline-custom ms-2" disabled title="ជ្រើសអង្គភាពដើម្បីទាញយក"> <i class="bi bi-file-earmark-zip me-1"></i> ទាញយកអត្តសញ្ញាណប័ណ្ណ</button>`;
                 }
